@@ -1,3 +1,4 @@
 # Directories to ignore
 lab1/
 **/target/
+**/bench/
