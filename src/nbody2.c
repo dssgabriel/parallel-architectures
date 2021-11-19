@@ -47,15 +47,15 @@ double randreal()
 
 vector add_vectors(vector a, vector b)
 {
-    vector c;
+    vector c = { 0.0, 0.0 };
 
     __asm__ volatile(
         "movapd %[a], %%xmm0;\n"
         "addpd  %[b], %%xmm0;\n"
         "movapd %%xmm0, %[c];\n"
 
-        :
-        : [a] "m" (a), [b] "m" (b), [c] "m" (c)
+        : [c] "=m" (c)
+        : [a] "m" (a), [b] "m" (b)
         : "cc", "memory", "xmm0");
 
     return c;
@@ -64,15 +64,15 @@ vector add_vectors(vector a, vector b)
 vector scale_vector(f64 b, vector a)
 {
     vector vb = { b, b };
-    vector c;
+    vector c = { 0.0, 0.0 };
 
     __asm__ volatile(
         "movapd %[a], %%xmm0;\n"
         "mulpd  %[b], %%xmm0;\n"
         "movapd %%xmm0, %[c];\n"
 
-        :
-        : [a] "m" (a), [b] "m" (vb), [c] "m" (c)
+        : [c] "=m" (c)
+        : [a] "m" (a), [b] "m" (vb)
         : "cc", "memory", "xmm0");
 
     return c;
@@ -80,15 +80,15 @@ vector scale_vector(f64 b, vector a)
 
 vector sub_vectors(vector a, vector b)
 {
-    vector c;
+    vector c = { 0.0, 0.0 };
 
     __asm__ volatile(
         "movapd %[a], %%xmm0;\n"
         "subpd  %[b], %%xmm0;\n"
         "movapd %%xmm0, %[c];\n"
 
-        :
-        : [a] "m" (a), [b] "m" (b), [c] "m" (c)
+        : [c] "=m" (c)
+        : [a] "m" (a), [b] "m" (b)
         : "cc", "memory", "xmm0");
 
     return c;
