@@ -66,7 +66,20 @@ vector add_vectors(vector a, vector b)
 
 vector scale_vector(f64 b, vector a)
 {
-    vector c = { b * a.x, b * a.y };
+    vector c;
+
+    __asm__ volatile(
+        "movq   %[ax], %%xmm0;\n"
+        "movq   %[ay], %%xmm1;\n"
+        "mulsd  %[b], %%xmm0;\n"
+        "mulsd  %[b], %%xmm1;\n"
+        "movq   %%xmm0, %[cx];\n"
+        "movq   %%xmm1, %[cy];\n"
+
+        : [cx] "=m" (c.x), [cy] "=m" (c.y)
+        : [ax] "m" (a.x), [ay] "m" (a.y), [b] "m" (b)
+        : "cc", "memory", "xmm0", "xmm1");
+
     return c;
 }
 
