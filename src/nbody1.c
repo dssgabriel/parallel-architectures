@@ -72,7 +72,20 @@ vector scale_vector(f64 b, vector a)
 
 vector sub_vectors(vector a, vector b)
 {
-    vector c = { a.x - b.x, a.y - b.y };
+    vector c;
+
+    __asm__ volatile(
+        "movq   %[ax], %%xmm0;\n"
+        "movq   %[ay], %%xmm1;\n"
+        "subsd  %[bx], %%xmm0;\n"
+        "subsd  %[by], %%xmm1;\n"
+        "movq   %%xmm0, %[cx];\n"
+        "movq   %%xmm1, %[cy];\n"
+
+        : [cx] "=m" (c.x), [cy] "=m" (c.y)
+        : [ax] "m" (a.x), [ay] "m" (a.y), [bx] "m" (b.x), [by] "m" (b.y)
+        : "cc", "memory", "xmm0", "xmm1");
+
     return c;
 }
 
