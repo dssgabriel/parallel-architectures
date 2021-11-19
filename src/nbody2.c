@@ -96,7 +96,20 @@ vector sub_vectors(vector a, vector b)
 
 f64 mod(vector a)
 {
-    return sqrt(a.x * a.x + a.y * a.y);
+    f64 r = 0.0;
+
+    __asm__ volatile(
+        "movapd %[a], %%xmm0;\n"
+        "mulpd  %%xmm0, %%xmm0;\n"
+        "haddpd %%xmm0, %%xmm0;\n"
+        "sqrtpd %%xmm0, %%xmm0;\n"
+        "movq   %%xmm0, %[r];\n"
+
+        : [r] "=m" (r)
+        : [a] "m" (a)
+        : "cc", "memory", "xmm0");
+
+    return r;
 }
 
 void init_system()
