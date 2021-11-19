@@ -50,12 +50,12 @@ vector add_vectors(vector a, vector b)
     vector c;
 
     __asm__ volatile(
-        "movq   %[ax], %%xmm0;\n"
-        "movq   %[ay], %%xmm1;\n"
+        "movsd  %[ax], %%xmm0;\n"
+        "movsd  %[ay], %%xmm1;\n"
         "addsd  %[bx], %%xmm0;\n"
         "addsd  %[by], %%xmm1;\n"
-        "movq   %%xmm0, %[cx];\n"
-        "movq   %%xmm1, %[cy];\n"
+        "movsd  %%xmm0, %[cx];\n"
+        "movsd  %%xmm1, %[cy];\n"
 
         : [cx] "=m" (c.x), [cy] "=m" (c.y)
         : [ax] "m" (a.x), [ay] "m" (a.y), [bx] "m" (b.x), [by] "m" (b.y)
@@ -69,12 +69,12 @@ vector scale_vector(f64 b, vector a)
     vector c;
 
     __asm__ volatile(
-        "movq   %[ax], %%xmm0;\n"
-        "movq   %[ay], %%xmm1;\n"
+        "movsd  %[ax], %%xmm0;\n"
+        "movsd  %[ay], %%xmm1;\n"
         "mulsd  %[b], %%xmm0;\n"
         "mulsd  %[b], %%xmm1;\n"
-        "movq   %%xmm0, %[cx];\n"
-        "movq   %%xmm1, %[cy];\n"
+        "movsd  %%xmm0, %[cx];\n"
+        "movsd  %%xmm1, %[cy];\n"
 
         : [cx] "=m" (c.x), [cy] "=m" (c.y)
         : [ax] "m" (a.x), [ay] "m" (a.y), [b] "m" (b)
@@ -88,12 +88,12 @@ vector sub_vectors(vector a, vector b)
     vector c;
 
     __asm__ volatile(
-        "movq   %[ax], %%xmm0;\n"
-        "movq   %[ay], %%xmm1;\n"
+        "movsd  %[ax], %%xmm0;\n"
+        "movsd  %[ay], %%xmm1;\n"
         "subsd  %[bx], %%xmm0;\n"
         "subsd  %[by], %%xmm1;\n"
-        "movq   %%xmm0, %[cx];\n"
-        "movq   %%xmm1, %[cy];\n"
+        "movsd  %%xmm0, %[cx];\n"
+        "movsd  %%xmm1, %[cy];\n"
 
         : [cx] "=m" (c.x), [cy] "=m" (c.y)
         : [ax] "m" (a.x), [ay] "m" (a.y), [bx] "m" (b.x), [by] "m" (b.y)
@@ -104,22 +104,22 @@ vector sub_vectors(vector a, vector b)
 
 f64 mod(vector a)
 {
-    f64 r = 0.0;
+    f64 res = 0.0;
 
     __asm__ volatile(
-        "movq   %[ax], %%xmm0;\n"
-        "movq   %[ay], %%xmm1;\n"
+        "movsd  %[ax], %%xmm0;\n"
+        "movsd  %[ay], %%xmm1;\n"
         "mulsd  %[ax], %%xmm0;\n"
         "mulsd  %[ay], %%xmm1;\n"
-        "addsd  %%xmm0, %%xmm0;\n"
+        "addsd  %%xmm1, %%xmm0;\n"
         "sqrtsd %%xmm0, %%xmm0;\n"
-        "movq   %%xmm0, %[r];\n"
+        "movsd  %%xmm0, %[r];\n"
 
-        : [r] "=m" (r)
+        : [r] "=m" (res)
         : [ax] "m" (a.x), [ay] "m" (a.y)
         : "cc", "memory", "xmm0", "xmm1");
 
-    return r;
+    return res;
 }
 
 void init_system()
