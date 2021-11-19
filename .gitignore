@@ -2,3 +2,6 @@
 lab1/
 **/target/
 **/bench/
+
+# Files to ignore
+**/*.html
