@@ -1,4 +1,5 @@
 #include <math.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -18,6 +19,8 @@ static const usize nbodies = 500;
 static const usize time_step = 1000;
 static const f64 mass = 5.0;
 static const f64 grav_cst = 1.0;
+static const f64 cst = grav_cst * mass;
+static usize hit = 0;
 
 vectors positions, velocities, accelerations;
 
@@ -47,12 +50,12 @@ double randreal()
 
 void init_system()
 {
-    positions.x = malloc(nbodies * sizeof(vectors));
-    positions.y = malloc(nbodies * sizeof(vectors));
-    velocities.x = malloc(nbodies * sizeof(vectors));
-    velocities.y = malloc(nbodies * sizeof(vectors));
-    accelerations.x = malloc(nbodies * sizeof(vectors));
-    accelerations.y = malloc(nbodies * sizeof(vectors));
+    positions.x = aligned_alloc(64, nbodies * sizeof(vectors));
+    positions.y = aligned_alloc(64, nbodies * sizeof(vectors));
+    velocities.x = aligned_alloc(64, nbodies * sizeof(vectors));
+    velocities.y = aligned_alloc(64, nbodies * sizeof(vectors));
+    accelerations.x = aligned_alloc(64, nbodies * sizeof(vectors));
+    accelerations.y = aligned_alloc(64, nbodies * sizeof(vectors));
 
     for (usize i = 0; i < nbodies; i++) {
         positions.x[i] = randxy(10, width);
@@ -73,35 +76,65 @@ void deinit_system()
     free(accelerations.y);
 }
 
-void resolve_collisions()
-{
-    for (usize i = 0; i < nbodies - 1; i++) {
-        for (usize j = i + 1; j < nbodies; j++) {
-            if (positions.x[i] == positions.x[j] &&
-                positions.y[i] == positions.y[j])
-	        {
-                f64 tmpx = velocities.x[i], tmpy = velocities.y[i];
-                velocities.x[i] = velocities.x[j];
-                velocities.y[i] = velocities.y[j];
-                velocities.x[j] = tmpx;
-                velocities.y[j] = tmpy;
-	        }
-        }
-	}
-}
-
 void compute_accelerations()
 { 
     for (usize i = 0; i < nbodies; i++) {
         accelerations.x[i] = 0;
         accelerations.y[i] = 0;
 
-        for (usize j = i + 1; j < nbodies; j++) {
-            f64 posx = positions.x[j] - positions.x[i];
-            f64 posy = positions.y[j] - positions.y[i];
-            f64 cst = grav_cst * mass / (pow(sqrt(posx * posx + posy * posy), 3) + 1e7);
-            accelerations.x[i] += cst * posx; 
-            accelerations.y[i] += cst * posy; 
+        f64 __attribute__((aligned(64))) posx[8];
+        f64 __attribute__((aligned(64))) posy[8];
+        f64 __attribute__((aligned(64))) modv[8];
+        f64 __attribute__((aligned(64))) dist[8];
+
+        for (usize j = i + 1; j < nbodies; j += 8) {
+            posx[0] = positions.x[j] - positions.x[i];
+            posx[1] = positions.x[j + 1] - positions.x[i];
+            posx[2] = positions.x[j + 2] - positions.x[i];
+            posx[3] = positions.x[j + 3] - positions.x[i];
+            posx[4] = positions.x[j + 4] - positions.x[i];
+            posx[5] = positions.x[j + 5] - positions.x[i];
+            posx[6] = positions.x[j + 6] - positions.x[i];
+            posx[7] = positions.x[j + 7] - positions.x[i];
+            
+            posy[0] = positions.y[j] - positions.y[i];
+            posy[1] = positions.y[j + 1] - positions.y[i];
+            posy[2] = positions.y[j + 2] - positions.y[i];
+            posy[3] = positions.y[j + 3] - positions.y[i];
+            posy[4] = positions.y[j + 4] - positions.y[i];
+            posy[5] = positions.y[j + 5] - positions.y[i];
+            posy[6] = positions.y[j + 6] - positions.y[i];
+            posy[7] = positions.y[j + 7] - positions.y[i];
+
+            modv[0] = sqrt(posx[0] * posx[0] + posy[0] * posy[0]);
+            modv[1] = sqrt(posx[1] * posx[1] + posy[1] * posy[1]);
+            modv[2] = sqrt(posx[2] * posx[2] + posy[2] * posy[2]);
+            modv[3] = sqrt(posx[3] * posx[3] + posy[3] * posy[3]);
+            modv[4] = sqrt(posx[4] * posx[4] + posy[4] * posy[4]);
+            modv[5] = sqrt(posx[5] * posx[5] + posy[5] * posy[5]);
+            modv[6] = sqrt(posx[6] * posx[6] + posy[6] * posy[6]);
+            modv[7] = sqrt(posx[7] * posx[7] + posy[7] * posy[7]);
+            
+            dist[0] = cst / (modv[0] * modv[0] * modv[0] + 1e7);
+            dist[1] = cst / (modv[1] * modv[1] * modv[1] + 1e7);
+            dist[2] = cst / (modv[2] * modv[2] * modv[2] + 1e7);
+            dist[3] = cst / (modv[3] * modv[3] * modv[3] + 1e7);
+            dist[4] = cst / (modv[4] * modv[4] * modv[4] + 1e7);
+            dist[5] = cst / (modv[5] * modv[5] * modv[5] + 1e7);
+            dist[6] = cst / (modv[6] * modv[6] * modv[6] + 1e7);
+            dist[7] = cst / (modv[7] * modv[7] * modv[7] + 1e7);
+        }
+
+        for (usize j = i + 1; j < nbodies; j += 8) {
+            accelerations.x[i] += (dist[0] * posx[0]) + (dist[1] * posx[1]) +
+                                  (dist[2] * posx[2]) + (dist[3] * posx[3]) + 
+                                  (dist[4] * posx[4]) + (dist[5] * posx[5]) +
+                                  (dist[6] * posx[6]) + (dist[7] * posx[7]);
+            accelerations.y[i] += (dist[0] * posy[0]) + (dist[1] * posy[1]) +
+                                  (dist[2] * posy[2]) + (dist[3] * posy[3]) +
+                                  (dist[4] * posy[4]) + (dist[5] * posy[5]) +
+                                  (dist[6] * posy[6]) + (dist[7] * posy[7]);
+
             accelerations.x[j] = -accelerations.x[i];
             accelerations.y[j] = -accelerations.y[i];
         }
@@ -129,10 +162,31 @@ void simulate()
     compute_accelerations();
     compute_positions();
     compute_velocities();
-    resolve_collisions();
 }
 
-int main()
+int headless()
+{
+    u8 quit = 0;
+    usize before, after;
+
+    srand(getpid());
+    init_system();
+
+    // Main loop
+    for (usize i = 0; !quit && i < time_step; i++) {	  
+        before = rdtsc();
+        simulate();
+        after = rdtsc();
+
+        printf("%zu %zu\n", i, (after - before));
+    }
+
+    deinit_system();
+
+    return 0;
+}
+
+int visual()
 {
     u8 quit = 0;
     usize before, after;
@@ -179,6 +233,17 @@ int main()
     SDL_DestroyWindow(window);
     SDL_Quit();
     deinit_system();
+    printf("%zu\n", hit);
 
     return 0;
+}
+
+int main()
+{
+#define SDL 0
+#if SDL == 0 
+    return headless();
+#else
+    return visual();
+#endif
 }
