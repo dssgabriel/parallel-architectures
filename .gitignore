@@ -1,7 +1,8 @@
 # Directories to ignore
-lab1/
 **/target/
 **/bench/
+**/maqao/
 
 # Files to ignore
 **/*.html
+*.pdf
