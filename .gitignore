@@ -2,7 +2,9 @@
 **/target/
 **/bench/
 **/maqao/
+**/opt_reports/
 
 # Files to ignore
 **/*.html
+**/*.tar
 *.pdf
