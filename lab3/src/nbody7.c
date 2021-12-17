@@ -35,104 +35,104 @@ void move_particles(f32 *x, f32 *y, f32 *z,
                     f32 *vx, f32 *vy, f32 *vz,
                     f32 *softening, f32 *dt, u64 n)
 {
-    __m256 pxi, pyi, pzi;
-    __m256 pxj, pyj, pzj;
-    __m256 vxi, vyi, vzi; 
-    __m256 fx, fy, fz;
-    __m256 dx, dy, dz;
-    __m256 d_2, d_2xy, d_2zs, d_2_rsqrt, d_3_over_2;
-    __m256 vsoft, vdt;
+    __m512 pxi, pyi, pzi;
+    __m512 pxj, pyj, pzj;
+    __m512 vxi, vyi, vzi; 
+    __m512 fx, fy, fz;
+    __m512 dx, dy, dz;
+    __m512 d_2, d_2xy, d_2zs, d_2_rsqrt, d_3_over_2;
+    __m512 vsoft, vdt;
 
-    pxi = _mm256_setzero_ps();
-    pyi = _mm256_setzero_ps();
-    pzi = _mm256_setzero_ps();
+    pxi = _mm512_setzero_ps();
+    pyi = _mm512_setzero_ps();
+    pzi = _mm512_setzero_ps();
 
-    pxj = _mm256_setzero_ps();
-    pyj= _mm256_setzero_ps();
-    pzj = _mm256_setzero_ps();
+    pxj = _mm512_setzero_ps();
+    pyj= _mm512_setzero_ps();
+    pzj = _mm512_setzero_ps();
 
-    vxi = _mm256_setzero_ps();
-    vyi = _mm256_setzero_ps();
-    vzi = _mm256_setzero_ps();
+    vxi = _mm512_setzero_ps();
+    vyi = _mm512_setzero_ps();
+    vzi = _mm512_setzero_ps();
 
-    dx = _mm256_setzero_ps();
-    dy = _mm256_setzero_ps();
-    dz = _mm256_setzero_ps();
-    d_2 = _mm256_setzero_ps();
-    d_2xy = _mm256_setzero_ps();
-    d_2zs = _mm256_setzero_ps();
-    d_2_rsqrt = _mm256_setzero_ps();
-    d_3_over_2 = _mm256_setzero_ps();
+    dx = _mm512_setzero_ps();
+    dy = _mm512_setzero_ps();
+    dz = _mm512_setzero_ps();
+    d_2 = _mm512_setzero_ps();
+    d_2xy = _mm512_setzero_ps();
+    d_2zs = _mm512_setzero_ps();
+    d_2_rsqrt = _mm512_setzero_ps();
+    d_3_over_2 = _mm512_setzero_ps();
 
-    vsoft = _mm256_load_ps(softening);
-    vdt = _mm256_load_ps(dt);
+    vsoft = _mm512_load_ps(softening);
+    vdt = _mm512_load_ps(dt);
 
     #pragma omp parallel for
     for (u64 i = 0; i < n; i++) {
-		fx = _mm256_setzero_ps();
-		fy = _mm256_setzero_ps();
-		fz = _mm256_setzero_ps();
+		fx = _mm512_setzero_ps();
+		fy = _mm512_setzero_ps();
+		fz = _mm512_setzero_ps();
 
 		// Load all i-bound values
-		pxi = _mm256_loadu_ps(x + i);
-		pyi = _mm256_loadu_ps(y + i);
-		pzi = _mm256_loadu_ps(z + i);
-		vxi = _mm256_loadu_ps(vx + i);
-		vyi = _mm256_loadu_ps(vy + i);
-		vzi = _mm256_loadu_ps(vz + i);
+		pxi = _mm512_loadu_ps(x + i);
+		pyi = _mm512_loadu_ps(y + i);
+		pzi = _mm512_loadu_ps(z + i);
+		vxi = _mm512_loadu_ps(vx + i);
+		vyi = _mm512_loadu_ps(vy + i);
+		vzi = _mm512_loadu_ps(vz + i);
 
-		for (u64 j = 0; j < n; j += 8) {
-			pxj = _mm256_load_ps(x + j);
-			pyj= _mm256_load_ps(y + j);
-			pzj = _mm256_load_ps(z + j);
+		for (u64 j = 0; j < n; j += 16) {
+			pxj = _mm512_load_ps(x + j);
+			pyj= _mm512_load_ps(y + j);
+			pzj = _mm512_load_ps(z + j);
 
-			dx = _mm256_sub_ps(pxj, pxi);
-			dy = _mm256_sub_ps(pyj, pyi);
-			dz = _mm256_sub_ps(pzj, pzi);
+			dx = _mm512_sub_ps(pxj, pxi);
+			dy = _mm512_sub_ps(pyj, pyi);
+			dz = _mm512_sub_ps(pzj, pzi);
 
-			dx = _mm256_mul_ps(dx, dx);
-			dy = _mm256_mul_ps(dy, dy);
-			dz = _mm256_mul_ps(dz, dz);
+			dx = _mm512_mul_ps(dx, dx);
+			dy = _mm512_mul_ps(dy, dy);
+			dz = _mm512_mul_ps(dz, dz);
 
-            d_2xy = _mm256_add_ps(dx, dy);
-            d_2zs = _mm256_add_ps(dz, vsoft);
-            d_2 = _mm256_add_ps(d_2xy, d_2zs);
-            d_2_rsqrt = _mm256_rsqrt14_ps(d_2);
-            d_3_over_2 = _mm256_mul_ps(d_2_rsqrt, d_2_rsqrt);
-            d_3_over_2 = _mm256_mul_ps(d_3_over_2, d_2_rsqrt);
+            d_2xy = _mm512_add_ps(dx, dy);
+            d_2zs = _mm512_add_ps(dz, vsoft);
+            d_2 = _mm512_add_ps(d_2xy, d_2zs);
+            d_2_rsqrt = _mm512_rsqrt14_ps(d_2);
+			d_3_over_2 = _mm512_mul_ps(d_2_rsqrt, d_2_rsqrt);
+			d_3_over_2 = _mm512_mul_ps(d_3_over_2, d_2_rsqrt);
 
-            fx = _mm256_fmadd_ps(dx, d_3_over_2, fx);
-            fy = _mm256_fmadd_ps(dy, d_3_over_2, fy);
-            fz = _mm256_fmadd_ps(dz, d_3_over_2, fz);
+            fx = _mm512_fmadd_ps(dx, d_3_over_2, fx);
+            fy = _mm512_fmadd_ps(dy, d_3_over_2, fy);
+            fz = _mm512_fmadd_ps(dz, d_3_over_2, fz);
 		}
 
-        vxi = _mm256_fmadd_ps(vdt, fx, vxi);
-        vyi = _mm256_fmadd_ps(vdt, fy, vyi);
-        vzi = _mm256_fmadd_ps(vdt, fz, vzi);
+        vxi = _mm512_fmadd_ps(vdt, fx, vxi);
+        vyi = _mm512_fmadd_ps(vdt, fy, vyi);
+        vzi = _mm512_fmadd_ps(vdt, fz, vzi);
 
-		_mm256_storeu_ps(vx + i, vxi);
-		_mm256_storeu_ps(vy + i, vyi);
-		_mm256_storeu_ps(vz + i, vzi);
+		_mm512_storeu_ps(vx + i, vxi);
+		_mm512_storeu_ps(vy + i, vyi);
+		_mm512_storeu_ps(vz + i, vzi);
 	}
 
 	// 3 f32ing-point operations
-	#pragma omp parallel for
-	for (u64 i = 0; i < n; i += 8) {
+    #pragma omp parallel for
+	for (u64 i = 0; i < n; i += 16) {
         // Reload v_i values
-    	pxi = _mm256_loadu_ps(x + i);
-    	pyi = _mm256_loadu_ps(y + i);
-    	pzi = _mm256_loadu_ps(z + i);
-    	vxi = _mm256_loadu_ps(vx + i);
-    	vyi = _mm256_loadu_ps(vy + i);
-    	vzi = _mm256_loadu_ps(vz + i);
+    	pxi = _mm512_loadu_ps(x + i);
+    	pyi = _mm512_loadu_ps(y + i);
+    	pzi = _mm512_loadu_ps(z + i);
+    	vxi = _mm512_loadu_ps(vx + i);
+    	vyi = _mm512_loadu_ps(vy + i);
+    	vzi = _mm512_loadu_ps(vz + i);
 
-        pxi = _mm256_fmadd_ps(vdt, vxi, pxi);
-        pyi = _mm256_fmadd_ps(vdt, vyi, pyi);
-        pzi = _mm256_fmadd_ps(vdt, vzi, pzi);
+        pxi = _mm512_fmadd_ps(vdt, vxi, pxi);
+        pyi = _mm512_fmadd_ps(vdt, vyi, pyi);
+        pzi = _mm512_fmadd_ps(vdt, vzi, pzi);
 
-		_mm256_storeu_ps(x + i, pxi);
-		_mm256_storeu_ps(y + i, pyi);
-		_mm256_storeu_ps(z + i, pzi);
+		_mm512_storeu_ps(x + i, pxi);
+		_mm512_storeu_ps(y + i, pyi);
+		_mm512_storeu_ps(z + i, pzi);
 	}
 }
 

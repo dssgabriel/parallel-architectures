@@ -40,7 +40,8 @@ void move_particles(f32 *x, f32 *y, f32 *z,
     __m256 vxi, vyi, vzi; 
     __m256 fx, fy, fz;
     __m256 dx, dy, dz;
-    __m256 d_2, d_2xy, d_2zs, d_2_rsqrt, d_3_over_2;
+    __m256 d_2, d_2xy, d_2zs, d_2_sqrt, d_3_over_2;
+    __m256 tmp_3x, tmp_3y, tmp_3z;
     __m256 vsoft, vdt;
 
     pxi = _mm256_setzero_ps();
@@ -61,8 +62,12 @@ void move_particles(f32 *x, f32 *y, f32 *z,
     d_2 = _mm256_setzero_ps();
     d_2xy = _mm256_setzero_ps();
     d_2zs = _mm256_setzero_ps();
-    d_2_rsqrt = _mm256_setzero_ps();
+    d_2_sqrt = _mm256_setzero_ps();
     d_3_over_2 = _mm256_setzero_ps();
+
+    tmp_3x = _mm256_setzero_ps();
+    tmp_3y = _mm256_setzero_ps();
+    tmp_3z = _mm256_setzero_ps();
 
     vsoft = _mm256_load_ps(softening);
     vdt = _mm256_load_ps(dt);
@@ -97,13 +102,17 @@ void move_particles(f32 *x, f32 *y, f32 *z,
             d_2xy = _mm256_add_ps(dx, dy);
             d_2zs = _mm256_add_ps(dz, vsoft);
             d_2 = _mm256_add_ps(d_2xy, d_2zs);
-            d_2_rsqrt = _mm256_rsqrt14_ps(d_2);
-            d_3_over_2 = _mm256_mul_ps(d_2_rsqrt, d_2_rsqrt);
-            d_3_over_2 = _mm256_mul_ps(d_3_over_2, d_2_rsqrt);
+            d_2_sqrt = _mm256_sqrt_ps(d_2);
+            d_3_over_2 = _mm256_mul_ps(d_2_sqrt, d_2_sqrt);
+            d_3_over_2 = _mm256_mul_ps(d_3_over_2, d_2_sqrt);
 
-            fx = _mm256_fmadd_ps(dx, d_3_over_2, fx);
-            fy = _mm256_fmadd_ps(dy, d_3_over_2, fy);
-            fz = _mm256_fmadd_ps(dz, d_3_over_2, fz);
+            tmp_3x = _mm256_div_ps(dx, d_3_over_2);
+            tmp_3y = _mm256_div_ps(dy, d_3_over_2);
+            tmp_3z = _mm256_div_ps(dz, d_3_over_2);
+
+            fx = _mm256_add_ps(fx, tmp_3x);
+            fy = _mm256_add_ps(fy, tmp_3y);
+            fz = _mm256_add_ps(fz, tmp_3z);
 		}
 
         vxi = _mm256_fmadd_ps(vdt, fx, vxi);
@@ -116,7 +125,7 @@ void move_particles(f32 *x, f32 *y, f32 *z,
 	}
 
 	// 3 f32ing-point operations
-	#pragma omp parallel for
+    #pragma omp parallel for
 	for (u64 i = 0; i < n; i += 8) {
         // Reload v_i values
     	pxi = _mm256_loadu_ps(x + i);

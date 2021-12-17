@@ -6,126 +6,126 @@
 
 #include "types.h"
 
-void init(float *x, float *y, float *z,
-          float *vx, float *vy, float *vz,
-          float *softening, float softening_value,
-          float *dt, float dt_value, u64 n)
+void init(f32 *x, f32 *y, f32 *z,
+          f32 *vx, f32 *vy, f32 *vz,
+          f32 *softening, f32 softening_value,
+          f32 *dt, f32 dt_value, u64 n)
 {
-	for (u64 i = 0; i < n; i++) {
-		u64 r1 = (u64)rand();
-		u64 r2 = (u64)rand();
-		f32 sign = (r1 > r2) ? 1 : -1;
+    for (u64 i = 0; i < n; i++) {
+        u64 r1 = (u64)rand();
+        u64 r2 = (u64)rand();
+        f32 sign = (r1 > r2) ? 1 : -1;
 
-		x[i] = sign * (f32)rand() / (f32)RAND_MAX;
-		y[i] = (f32)rand() / (f32)RAND_MAX;
-		z[i] = sign * (f32)rand() / (f32)RAND_MAX;
+        x[i] = sign * (f32)rand() / (f32)RAND_MAX;
+        y[i] = (f32)rand() / (f32)RAND_MAX;
+        z[i] = sign * (f32)rand() / (f32)RAND_MAX;
 
-		vx[i] = (f32)rand() / (f32)RAND_MAX;
-		vy[i] = sign * (f32)rand() / (f32)RAND_MAX;
-		vz[i] = (f32)rand() / (f32)RAND_MAX;
-	}
+        vx[i] = (f32)rand() / (f32)RAND_MAX;
+        vy[i] = sign * (f32)rand() / (f32)RAND_MAX;
+        vz[i] = (f32)rand() / (f32)RAND_MAX;
+    }
 
-	for (u64 i = 0; i < 16 ; i++) {
-		softening[i] = softening_value;
-		dt[i] = dt_value;
-	}
+    for (u64 i = 0; i < 16 ; i++) {
+        softening[i] = softening_value;
+        dt[i] = dt_value;
+    }
 }
 
-void move_particles(float *x, float *y, float *z,
-                    float *vx, float *vy, float *vz,
-                    float *softening, float *dt, u64 n)
+void move_particles(f32 *x, f32 *y, f32 *z,
+                    f32 *vx, f32 *vy, f32 *vz,
+                    f32 *softening, f32 *dt, u64 n)
 {
-    __m512 rxi, ryi, rzi, rxj, ryj, rzj;
-    __m512 rvxi, rvyi, rvzi; 
-    __m512 rfx, rfy, rfz;
-    __m512 rdx, rdy, rdz;
-    __m512 rd_2, rd_2xy, rd_2zs, rd_2_rsqrt, rsoft, rdt;
+    __m256 d_2, d_2xy, d_2zs, d_2_rsqrt, d_3_over_2;
 
-    rxi = _mm512_setzero_ps();
-    ryi = _mm512_setzero_ps();
-    rzi = _mm512_setzero_ps();
+    __m256 pxi = _mm256_setzero_ps();
+    __m256 pyi = _mm256_setzero_ps();
+    __m256 pzi = _mm256_setzero_ps();
 
-    rxj = _mm512_setzero_ps();
-    ryj = _mm512_setzero_ps();
-    rzj = _mm512_setzero_ps();
+    __m256 pxj = _mm256_setzero_ps();
+    __m256 pyj= _mm256_setzero_ps();
+    __m256 pzj = _mm256_setzero_ps();
 
-    rvxi = _mm512_setzero_ps();
-    rvyi = _mm512_setzero_ps();
-    rvzi = _mm512_setzero_ps();
+    __m256 vxi = _mm256_setzero_ps();
+    __m256 vyi = _mm256_setzero_ps();
+    __m256 vzi = _mm256_setzero_ps();
 
-    rdx = _mm512_setzero_ps();
-    rdy = _mm512_setzero_ps();
-    rdz = _mm512_setzero_ps();
-    rd_2 = _mm512_setzero_ps();
-    rd_2xy = _mm512_setzero_ps();
-    rd_2zs = _mm512_setzero_ps();
-    rd_2_rsqrt = _mm512_setzero_ps();
+    __m256 dx = _mm256_setzero_ps();
+    __m256 dy = _mm256_setzero_ps();
+    __m256 dz = _mm256_setzero_ps();
 
-    rsoft = _mm512_load_ps(softening);
-    rdt = _mm512_load_ps(dt);
+    d_2 = _mm256_setzero_ps();
+    d_2xy = _mm256_setzero_ps();
+    d_2zs = _mm256_setzero_ps();
+    d_2_rsqrt = _mm256_setzero_ps();
+    d_3_over_2 = _mm256_setzero_ps();
+
+    __m256 vsoft = _mm256_load_ps(softening);
+    __m256 vdt = _mm256_load_ps(dt);
 
     for (u64 i = 0; i < n; i++) {
-		rfx = _mm512_setzero_ps();
-		rfy = _mm512_setzero_ps();
-		rfz = _mm512_setzero_ps();
+		__m256 fx = _mm256_setzero_ps();
+		__m256 fy = _mm256_setzero_ps();
+		__m256 fz = _mm256_setzero_ps();
 
-		// Load i-bound values
-		rxi = _mm512_loadu_ps(&x[i]);
-		ryi = _mm512_loadu_ps(&y[i]);
-		rzi = _mm512_loadu_ps(&z[i]);
-		rvxi = _mm512_loadu_ps(&vx[i]);
-		rvyi = _mm512_loadu_ps(&vy[i]);
-		rvzi = _mm512_loadu_ps(&vz[i]);
+		// Load all i-bound values
+		pxi = _mm256_loadu_ps(x + i);
+		pyi = _mm256_loadu_ps(y + i);
+		pzi = _mm256_loadu_ps(z + i);
+		vxi = _mm256_loadu_ps(vx + i);
+		vyi = _mm256_loadu_ps(vy + i);
+		vzi = _mm256_loadu_ps(vz + i);
 
-		for (u64 j = 0; j < n; j += 16) {
-			rxj = _mm512_load_ps(&x[j]);
-			ryj = _mm512_load_ps(&y[j]);
-			rzj = _mm512_load_ps(&z[j]);
+		for (u64 j = 0; j < n; j += 8) {
+			pxj = _mm256_load_ps(x + j);
+			pyj= _mm256_load_ps(y + j);
+			pzj = _mm256_load_ps(z + j);
 
-			rdx = _mm512_sub_ps(rxj, rxi);
-			rdy = _mm512_sub_ps(ryj, ryi);
-			rdz = _mm512_sub_ps(rzj, rzi);
+			dx = _mm256_sub_ps(pxj, pxi);
+			dy = _mm256_sub_ps(pyj, pyi);
+			dz = _mm256_sub_ps(pzj, pzi);
 
-			rdx = _mm512_sub_ps(rdx, rdx);
-			rdy = _mm512_sub_ps(rdy, rdy);
-			rdz = _mm512_add_ps(rdz, rdz);
+			dx = _mm256_mul_ps(dx, dx);
+			dy = _mm256_mul_ps(dy, dy);
+			dz = _mm256_mul_ps(dz, dz);
 
-            rd_2xy = _mm512_add_ps(rdx, rdy);
-            rd_2zs = _mm512_add_ps(rdz, rsoft);
-            rd_2 = _mm512_add_ps(rd_2xy, rd_2zs);
-            rd_2_rsqrt = _mm512_rsqrt14_ps(rd_2);
+            d_2xy = _mm256_add_ps(dx, dy);
+            d_2zs = _mm256_add_ps(dz, vsoft);
+            d_2 = _mm256_add_ps(d_2xy, d_2zs);
+            d_2_rsqrt = _mm256_rsqrt14_ps(d_2);
+            d_3_over_2 = _mm256_mul_ps(d_2_rsqrt, d_2_rsqrt);
+            d_3_over_2 = _mm256_mul_ps(d_3_over_2, d_2_rsqrt);
 
-            rfx = _mm512_fmadd_ps(rdx, rd_2_rsqrt, rfx);
-            rfy = _mm512_fmadd_ps(rdy, rd_2_rsqrt, rfy);
-            rfz = _mm512_fmadd_ps(rdz, rd_2_rsqrt, rfz);
+            fx = _mm256_fmadd_ps(dx, d_3_over_2, fx);
+            fy = _mm256_fmadd_ps(dy, d_3_over_2, fy);
+            fz = _mm256_fmadd_ps(dz, d_3_over_2, fz);
 		}
 
-        rvxi = _mm512_fmadd_ps(rdt, rfx, rvxi);
-        rvyi = _mm512_fmadd_ps(rdt, rfy, rvyi);
-        rvzi = _mm512_fmadd_ps(rdt, rfz, rvzi);
+        vxi = _mm256_fmadd_ps(vdt, fx, vxi);
+        vyi = _mm256_fmadd_ps(vdt, fy, vyi);
+        vzi = _mm256_fmadd_ps(vdt, fz, vzi);
 
-		_mm512_storeu_ps(&vx[i], rvxi);
-		_mm512_storeu_ps(&vy[i], rvyi);
-		_mm512_storeu_ps(&vz[i], rvzi);
+		_mm256_storeu_ps(vx + i, vxi);
+		_mm256_storeu_ps(vy + i, vyi);
+		_mm256_storeu_ps(vz + i, vzi);
 	}
 
-	// 3 floating-point operations
-	for (u64 i = 0; i < n; i++) {
+	// 3 f32ing-point operations
+	for (u64 i = 0; i < n; i += 8) {
         // Reload v_i values
-    	rxi = _mm512_loadu_ps(&x[i]);
-    	ryi = _mm512_loadu_ps(&y[i]);
-    	rzi = _mm512_loadu_ps(&z[i]);
-    	rvxi = _mm512_loadu_ps(&vx[i]);
-    	rvyi = _mm512_loadu_ps(&vy[i]);
-    	rvzi = _mm512_loadu_ps(&vz[i]);
+    	pxi = _mm256_loadu_ps(x + i);
+    	pyi = _mm256_loadu_ps(y + i);
+    	pzi = _mm256_loadu_ps(z + i);
+    	vxi = _mm256_loadu_ps(vx + i);
+    	vyi = _mm256_loadu_ps(vy + i);
+    	vzi = _mm256_loadu_ps(vz + i);
 
-        rxi = _mm512_fmadd_ps(rdt, rvxi, rxi);
-        ryi = _mm512_fmadd_ps(rdt, rvyi, ryi);
-        rzi = _mm512_fmadd_ps(rdt, rvzi, rzi);
+        pxi = _mm256_fmadd_ps(vdt, vxi, pxi);
+        pyi = _mm256_fmadd_ps(vdt, vyi, pyi);
+        pzi = _mm256_fmadd_ps(vdt, vzi, pzi);
 
-		_mm512_storeu_ps(&x[i], rxi);
-		_mm512_storeu_ps(&y[i], ryi);
-		_mm512_storeu_ps(&z[i], rzi);
+		_mm256_storeu_ps(x + i, pxi);
+		_mm256_storeu_ps(y + i, pyi);
+		_mm256_storeu_ps(z + i, pzi);
 	}
 }
 
@@ -140,20 +140,22 @@ int main(int argc, char **argv)
 	// Steps to skip for warm up
 	const u64 warmup = 3;
 
-	float *x = aligned_alloc(64, sizeof(float) * (n + 64));
-	float *y = aligned_alloc(64, sizeof(float) * (n + 64));
-	float *z = aligned_alloc(64, sizeof(float) * (n + 64));
-	float *vx = aligned_alloc(64, sizeof(float) * (n + 64));
-	float *vy = aligned_alloc(64, sizeof(float) * (n + 64));
-	float *vz = aligned_alloc(64, sizeof(float) * (n + 64));
-	float *softening = aligned_alloc(64, sizeof(float) * 16);
-	float *dt = aligned_alloc(64, sizeof(float) * 16);
+	f32 *x = aligned_alloc(64, sizeof(f32) * (n + 64));
+	f32 *y = aligned_alloc(64, sizeof(f32) * (n + 64));
+	f32 *z = aligned_alloc(64, sizeof(f32) * (n + 64));
+	f32 *vx = aligned_alloc(64, sizeof(f32) * (n + 64));
+	f32 *vy = aligned_alloc(64, sizeof(f32) * (n + 64));
+	f32 *vz = aligned_alloc(64, sizeof(f32) * (n + 64));
+	f32 *softening = aligned_alloc(64, sizeof(f32) * 16);
+	f32 *dt = aligned_alloc(64, sizeof(f32) * 16);
 
 	init(x, y,z, vx, vy, vz, softening, softening_value, dt, dt_value, n);
 
-	const u64 sx = 6 * sizeof(double) * n;
-	printf("\n\033[1mTotal memory size:\033[0m %llu B, %llu KiB, %llu MiB\n\n", sx, sx >> 10, sx >> 20);
-	printf("\033[1m%5s %10s %10s %8s\033[0m\n", "Step", "Time, s", "Interact/s", "GFLOP/s");
+	const u64 sp = 6 * sizeof(f64) * n;
+	printf("\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
+	       sp, (f64)sp / 1024.0f, (f64)sp / 1048576.0f);
+	printf("\033[1m%5s %10s %10s %8s\033[0m\n",
+	       "Step", "Time, s", "Interact/s", "GFLOP/s");
 	fflush(stdout);
 
 	for (u64 i = 0; i < steps; i++) {
@@ -164,7 +166,6 @@ int main(int argc, char **argv)
 
         // Number of interactions/iterations
         const f32 h1 = (f32)(n) * (f32)(n - 1);
-
         // GFLOPS
         const f32 h2 = (23.0 * h1 + 3.0 * (f32)n) * 1e-9;
 
@@ -198,5 +199,6 @@ int main(int argc, char **argv)
 	free(vz);
 	free(softening);
 	free(dt);
+
 	return 0;
 }
