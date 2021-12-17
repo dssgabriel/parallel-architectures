@@ -41,70 +41,44 @@ particle_t *init(u64 n)
 
 void move_particles(particle_t *p, const f32 dt, u64 n)
 {
-    const f32 softening = 1e-20;
+    static const f32 softening = 1e-20;
 
+    #pragma omp parallel for
     for (u64 i = 0; i < n; i++) {
-        f32 __attribute__((aligned(64))) fx[4] = { 0.0 };
-        f32 __attribute__((aligned(64))) fy[4] = { 0.0 };
-        f32 __attribute__((aligned(64))) fz[4] = { 0.0 };
+        f32 fx = 0.0;
+        f32 fy = 0.0;
+        f32 fz = 0.0;
+
+        const f32 pxi = p->x[i];
+        const f32 pyi = p->y[i];
+        const f32 pzi = p->z[i];
 
         // 23 floating-point operations
-        for (u64 j = 0; j < n; j += 4) {
+        #pragma omp simd
+        for (u64 j = 0; j < n; j++) {
             // Newton's law
-            f32 __attribute__((aligned(64))) dx[4];
-            f32 __attribute__((aligned(64))) dy[4];
-            f32 __attribute__((aligned(64))) dz[4];
-            f32 __attribute__((aligned(64))) d_2[4];
-            f32 __attribute__((aligned(64))) d_3_over_2[4];
+            const f32 dx = p->x[j] - pxi; // 1
+            const f32 dy = p->y[j] - pyi; // 1
+            const f32 dz = p->z[j] - pzi; // 1
 
-            dx[0] = p->x[j] - p->x[i]; // 1
-            dx[1] = p->x[j + 1] - p->x[i + 1]; // 1
-            dx[2] = p->x[j + 2] - p->x[i + 2]; // 1
-            dx[3] = p->x[j + 3] - p->x[i + 3]; // 1
-
-            dy[0] = p->y[j] - p->y[i]; // 1
-            dy[1] = p->y[j + 1] - p->y[i + 1]; // 1
-            dy[2] = p->y[j + 2] - p->y[i + 2]; // 1
-            dy[3] = p->y[j + 3] - p->y[i + 3]; // 1
-
-            dz[0] = p->z[j] - p->z[i]; // 1
-            dz[1] = p->z[j + 1] - p->z[i + 1]; // 1
-            dz[2] = p->z[j + 2] - p->z[i + 2]; // 1
-            dz[3] = p->z[j + 3] - p->z[i + 3]; // 1
-
-            d_2[0] = (dx[0] * dx[0]) + (dy[0] * dy[0]) + (dz[0] * dz[0]) + softening; // 9
-            d_2[1] = (dx[1] * dx[1]) + (dy[1] * dy[1]) + (dz[1] * dz[1]) + softening; // 9
-            d_2[2] = (dx[2] * dx[2]) + (dy[2] * dy[2]) + (dz[2] * dz[2]) + softening; // 9
-            d_2[3] = (dx[3] * dx[3]) + (dy[3] * dy[3]) + (dz[3] * dz[3]) + softening; // 9
-
-            d_3_over_2[0] = sqrtf(d_2[0]) * sqrt(d_2[0]) * sqrt(d_2[0]); // 11
-            d_3_over_2[1] = sqrtf(d_2[1]) * sqrt(d_2[1]) * sqrt(d_2[1]); // 11
-            d_3_over_2[2] = sqrtf(d_2[2]) * sqrt(d_2[2]) * sqrt(d_2[2]); // 11
-            d_3_over_2[3] = sqrtf(d_2[3]) * sqrt(d_2[3]) * sqrt(d_2[3]); // 11
+            const f32 d_2 = (dx * dx) + (dy * dy) + (dz * dz) + softening; // 9
+            const f32 d_2_sqrt = sqrtf(d_2);
+            const f32 d_2_rsqrt = 1.0f / d_2_sqrt;
+            const f32 d_3_over_2 = d_2_rsqrt * d_2_rsqrt * d_2_rsqrt; // 11
 
             // Net force
-            fx[0] += dx[0] * (1 / d_3_over_2[0]); // 13
-            fx[1] += dx[1] * (1 / d_3_over_2[1]); // 13
-            fx[2] += dx[2] * (1 / d_3_over_2[2]); // 13
-            fx[3] += dx[3] * (1 / d_3_over_2[3]); // 13
-
-            fy[0] += dy[0] * (1 / d_3_over_2[0]); // 15
-            fy[1] += dy[1] * (1 / d_3_over_2[1]); // 15
-            fy[2] += dy[2] * (1 / d_3_over_2[2]); // 15
-            fy[3] += dy[3] * (1 / d_3_over_2[3]); // 15
-
-            fz[0] += dz[0] * (1 / d_3_over_2[0]); // 17
-            fz[1] += dz[1] * (1 / d_3_over_2[1]); // 17
-            fz[2] += dz[2] * (1 / d_3_over_2[2]); // 17
-            fz[3] += dz[3] * (1 / d_3_over_2[3]); // 17
+            fx += dx * d_3_over_2; // 13
+            fy += dy * d_3_over_2; // 15
+            fz += dz * d_3_over_2; // 17
     	}
 
-        p->vx[i] += dt * (fx[0] + fx[1] + fx[2] + fx[3]); // 19
-        p->vy[i] += dt * (fy[0] + fy[1] + fy[2] + fy[3]); // 21
-        p->vz[i] += dt * (fz[0] + fz[1] + fz[2] + fz[3]); // 23
+        p->vx[i] += dt * fx; // 19
+        p->vy[i] += dt * fy; // 21
+        p->vz[i] += dt * fz; // 23
     }
 
     // 3 floating-point operations
+    #pragma omp parallel for
     for (u64 i = 0; i < n; i++) {
         p->x[i] += dt * p->vx[i];
         p->y[i] += dt * p->vy[i];

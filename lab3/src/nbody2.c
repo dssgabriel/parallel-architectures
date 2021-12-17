@@ -41,27 +41,33 @@ particle_t *init(u64 n)
 
 void move_particles(particle_t *p, const f32 dt, u64 n)
 {
-    const f32 softening = 1e-20;
+    static const f32 softening = 1e-20;
 
     for (u64 i = 0; i < n; i++) {
         f32 fx = 0.0;
         f32 fy = 0.0;
         f32 fz = 0.0;
 
+        const f32 pxi = p->x[i];
+        const f32 pyi = p->y[i];
+        const f32 pzi = p->z[i];
+
         // 23 floating-point operations
         for (u64 j = 0; j < n; j++) {
             // Newton's law
-            const f32 dx = p->x[j] - p->x[i]; // 1
-            const f32 dy = p->y[j] - p->y[i]; // 1
-            const f32 dz = p->z[j] - p->z[i]; // 1
+            const f32 dx = p->x[j] - pxi; // 1
+            const f32 dy = p->y[j] - pyi; // 1
+            const f32 dz = p->z[j] - pzi; // 1
 
             const f32 d_2 = (dx * dx) + (dy * dy) + (dz * dz) + softening; // 9
-            const f32 d_3_over_2 = sqrtf(d_2) * sqrtf(d_2) * sqrtf(d_2); // 11
+            const f32 d_2_sqrt = sqrtf(d_2);
+            const f32 d_2_rsqrt = 1.0f / d_2_sqrt;
+            const f32 d_3_over_2 = d_2_rsqrt * d_2_rsqrt * d_2_rsqrt; // 11
 
             // Net force
-            fx += dx * (1 / d_3_over_2); // 13
-            fy += dy * (1 / d_3_over_2); // 15
-            fz += dz * (1 / d_3_over_2); // 17
+            fx += dx * d_3_over_2; // 13
+            fy += dy * d_3_over_2; // 15
+            fz += dz * d_3_over_2; // 17
     	}
 
         p->vx[i] += dt * fx; // 19
