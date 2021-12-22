@@ -14,10 +14,10 @@ typedef struct {
 
 static const usize width = 800;
 static const usize height = 800;
-static const usize nbodies = 500;
-static const usize time_step = 1000;
-static const f64 mass = 5.0;
-static const f64 grav_cst = 1.0;
+static const usize nbodies = 2000;
+static const usize time_step = 2000;
+static const f64 mass = 10.0;
+static const f64 grav_cst = 1.5;
 
 vector *positions, *velocities, *accelerations;
 
