@@ -7,7 +7,7 @@
 experiment_name = nil
 
 -- Name of the executable to analyze
-executable     = "target/nbody5.i"
+executable     = "target/icx/nbody_par_avx.x"
 
 -- List of external libraries to analyze
 external_libraries = {
