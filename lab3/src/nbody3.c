@@ -100,8 +100,11 @@ int main(int argc, char **argv)
     particle_t *p = init(n);
     const u64 s = sizeof(particle_t) * n;
 
-    printf("\n\033[1mTotal memory size:\033[0m %llu B, %llu KiB, %llu MiB\n\n", s, s >> 10, s >> 20);
-    printf("\033[1m%5s %10s %10s %8s\033[0m\n", "Step", "Time, s", "Interact/s", "GFLOP/s"); fflush(stdout);
+    printf("\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
+           s, (f64)s / 1024.0f, (f64)s / 1048576.0f);
+    printf("\033[1m%5s %10s %10s %8s\033[0m\n",
+           "Step", "Time, s", "Interact/s", "GFLOP/s");
+    fflush(stdout);
 
     for (u64 i = 0; i < steps; i++) {
         // Measure
