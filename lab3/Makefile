@@ -1,64 +1,55 @@
-all: target/nbody0.g target/nbody0.i target/nbody1.g target/nbody1.i target/nbody2.g target/nbody2.i target/nbody2.l target/nbody3.g target/nbody3.i target/nbody_seq_avx.g target/nbody_seq_avx.i target/nbody_par_avx.g target/nbody_par_avx.i target/nbody_seq_avx512.g target/nbody_seq_avx512.i target/nbody_par_avx512.g target/nbody_par_avx512.i
-	@mv target/*.optrpt opt_reports/
+# Macros
+GC=gcc
+LC=clang
+IC=icc
+XC=icx
 
-target/nbody0.g: src/nbody0.c
-	@mkdir -p target opt_reports
-	gcc -march=native -mtune=native -mavx2 -Ofast -fopt-info-all=opt_reports/nbody0.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody0.i: src/nbody0.c
-	@mkdir -p target opt_reports
-	icc -xHost -Ofast -qopt-report $< -o $@ -qmkl -qopenmp
+GFLAGS=-march=native -mtune=native -mavx2 -Ofast -finline-functions -funroll-loops -fpeel-loops -floop-interchange -ftree-vectorize -ftree-loop-vectorize -flto
+LFLAGS=-march=native -mtune=native -mavx2 -Ofast -finline-functions -funroll-loops
+IFLAGS=-w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -flto
 
-target/nbody1.g: src/nbody1.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx2 -Ofast -fopt-info-all=opt_reports/nbody1.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody1.i: src/nbody1.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
+GLLD=-lm -fopenmp
+IXLD=-qmkl -qopenmp
 
-target/nbody2.g: src/nbody2.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -funroll-loops -finline-functions -ftree-vectorize -ftree-loop-vectorize -fopt-info-all=opt_reports/nbody2.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody2.i: src/nbody2.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
-target/nbody2.l: src/nbody2.c
-	@mkdir -p target opt_reports
-	clang -Wall -g -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -fopenmp -funroll-loops -finline-functions -ftree-vectorize $< -o $@ -lm
+# Rules
+all: 0 1 2 3 _seq_avx _par_avx _seq_avx512 _par_avx512
 
-target/nbody3.g: src/nbody3.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -funroll-loops -finline-functions -ftree-vectorize -ftree-loop-vectorize -fopt-info-all=opt_reports/nbody3.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody3.i: src/nbody3.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
-  
-target/nbody_seq_avx.g: src/nbody_seq_avx.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -funroll-loops -finline-functions -ftree-vectorize -ftree-loop-vectorize -fopt-info-all=opt_reports/nbody_seq_avx.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody_seq_avx.i: src/nbody_seq_avx.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
-  
-target/nbody_par_avx.g: src/nbody_par_avx.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -funroll-loops -finline-functions -ftree-vectorize -ftree-loop-vectorize -fopt-info-all=opt_reports/nbody_par_avx.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody_par_avx.i: src/nbody_par_avx.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
-  
-target/nbody_seq_avx512.g: src/nbody_seq_avx512.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -funroll-loops -finline-functions -ftree-vectorize -ftree-loop-vectorize -fopt-info-all=opt_reports/nbody5.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody_seq_avx512.i: src/nbody_seq_avx512.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
+seq: 0 1 2 _seq_avx _seq_avx512
 
-target/nbody_par_avx512.g: src/nbody_par_avx512.c
-	@mkdir -p target opt_reports
-	gcc -Wall -Wextra -g3 -march=native -mtune=native -mavx512f -mavx2 -Ofast -funroll-loops -finline-functions -ftree-vectorize -ftree-loop-vectorize -fopt-info-all=opt_reports/nbody5.gcc.optrpt $< -o $@ -lm -fopenmp
-target/nbody_par_avx512.i: src/nbody_par_avx512.c
-	@mkdir -p target opt_reports
-	icc -w3 -g3 -xHost -Ofast -funroll-loops -finline-functions -qopt-report $< -o $@ -qmkl -qopenmp
+par: 3 _par_avx _par_avx512
+
+0: target/gcc/nbody0.g target/clang/nbody0.l target/icc/nbody0.i target/icx/nbody0.x
+
+1: target/gcc/nbody1.g target/clang/nbody1.l target/icc/nbody1.i target/icx/nbody1.x
+
+2: target/gcc/nbody2.g target/clang/nbody2.l target/icc/nbody2.i target/icx/nbody2.x
+
+3: target/gcc/nbody3.g target/clang/nbody3.l target/icc/nbody3.i target/icx/nbody3.x
+
+_seq_avx: target/gcc/nbody_seq_avx.g target/clang/nbody_seq_avx.l target/icc/nbody_seq_avx.i target/icx/nbody_seq_avx.x
+
+_par_avx: target/gcc/nbody_par_avx.g target/clang/nbody_par_avx.l target/icc/nbody_par_avx.i target/icx/nbody_par_avx.x
+
+_seq_avx512: target/gcc/nbody_seq_avx512.g target/clang/nbody_seq_avx512.l target/icc/nbody_seq_avx512.i target/icx/nbody_seq_avx512.x
+
+_par_avx512: target/gcc/nbody_par_avx512.g target/clang/nbody_par_avx512.l target/icc/nbody_par_avx512.i target/icx/nbody_par_avx512.x
+	
+# Compilation
+target/gcc/nbody%.g: src/nbody%.c
+	@mkdir -p target/gcc/
+	$(GC) $(GFLAGS) $< -o $@ $(GLLD)
+
+target/clang/nbody%.l: src/nbody%.c
+	@mkdir -p target/clang/
+	$(LC) $(LFLAGS) $< -o $@ $(GLLD)
+
+target/icc/nbody%.i: src/nbody%.c
+	@mkdir -p target/icc/
+	$(IC) $(IFLAGS) $< -o $@ $(IXLD)
+	
+target/icx/nbody%.x: src/nbody%.c
+	@mkdir -p target/icx/
+	$(XC) $(IFLAGS) $< -o $@ $(IXLD)
 
 clean:
 	@rm -Rf target/ opt_reports/ maqao/*
