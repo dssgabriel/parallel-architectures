@@ -68,11 +68,11 @@ void move_particles(particle_t *p, const f32 dt, u64 n)
         p->vz[i] += dt * fz; // 23
     }
 
-    // 3 floating-point operations
+    // 6 floating-point operations
     for (u64 i = 0; i < n; i++) {
-        p->x[i] += dt * p->vx[i];
-        p->y[i] += dt * p->vy[i];
-        p->z[i] += dt * p->vz[i];
+        p->x[i] += dt * p->vx[i]; // 2
+        p->y[i] += dt * p->vy[i]; // 4
+        p->z[i] += dt * p->vz[i]; // 6
     }
 }
 

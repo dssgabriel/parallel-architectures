@@ -56,11 +56,11 @@ void move_particles(particle_t *p, const f32 dt, u64 n)
         p[i].vz += dt * fz; // 23
     }
 
-    // 3 floating-point operations
+    // 6 floating-point operations
     for (u64 i = 0; i < n; i++) {
-        p[i].x += dt * p[i].vx;
-        p[i].y += dt * p[i].vy;
-        p[i].z += dt * p[i].vz;
+        p[i].x += dt * p[i].vx; // 2
+        p[i].y += dt * p[i].vy; // 4
+        p[i].z += dt * p[i].vz; // 6
     }
 }
 
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f32 h1 = (f32)(n) * (f32)(n - 1);
         // GFLOPS
-        const f32 h2 = (23.0 * h1 + 3.0 * (f32)n) * 1e-9;
+        const f32 h2 = (23.0 * h1 + 6.0 * (f32)n) * 1e-9;
 
         if (i >= warmup) {
             rate += h2 / (end - start);

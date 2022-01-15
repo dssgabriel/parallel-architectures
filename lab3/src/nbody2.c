@@ -44,42 +44,42 @@ void move_particles(particle_t *p, const f32 dt, u64 n)
     static const f32 softening = 1e-20;
 
     for (u64 i = 0; i < n; i++) {
-        f32 fx = 0.0;
-        f32 fy = 0.0;
-        f32 fz = 0.0;
+        f32 fx = 0.0f;
+        f32 fy = 0.0f;
+        f32 fz = 0.0f;
 
         const f32 pxi = p->x[i];
         const f32 pyi = p->y[i];
         const f32 pzi = p->z[i];
 
-        // 23 floating-point operations
+        // 25 floating-point operations
         for (u64 j = 0; j < n; j++) {
             // Newton's law
             const f32 dx = p->x[j] - pxi; // 1
-            const f32 dy = p->y[j] - pyi; // 1
-            const f32 dz = p->z[j] - pzi; // 1
+            const f32 dy = p->y[j] - pyi; // 2
+            const f32 dz = p->z[j] - pzi; // 3
 
             const f32 d_2 = (dx * dx) + (dy * dy) + (dz * dz) + softening; // 9
-            const f32 d_2_sqrt = sqrtf(d_2);
-            const f32 d_2_rsqrt = 1.0f / d_2_sqrt;
-            const f32 d_3_over_2 = d_2_rsqrt * d_2_rsqrt * d_2_rsqrt; // 11
+            const f32 d_2_sqrt = sqrtf(d_2); // 10
+            const f32 d_2_rsqrt = 1.0f / d_2_sqrt; // 11
+            const f32 d_3_over_2 = d_2_rsqrt * d_2_rsqrt * d_2_rsqrt; // 13
 
             // Net force
-            fx += dx * d_3_over_2; // 13
-            fy += dy * d_3_over_2; // 15
-            fz += dz * d_3_over_2; // 17
+            fx += dx * d_3_over_2; // 15
+            fy += dy * d_3_over_2; // 17
+            fz += dz * d_3_over_2; // 19
     	}
 
-        p->vx[i] += dt * fx; // 19
-        p->vy[i] += dt * fy; // 21
-        p->vz[i] += dt * fz; // 23
+        p->vx[i] += dt * fx; // 21
+        p->vy[i] += dt * fy; // 23
+        p->vz[i] += dt * fz; // 25
     }
 
-    // 3 floating-point operations
+    // 6 floating-point operations
     for (u64 i = 0; i < n; i++) {
-        p->x[i] += dt * p->vx[i];
-        p->y[i] += dt * p->vy[i];
-        p->z[i] += dt * p->vz[i];
+        p->x[i] += dt * p->vx[i]; // 2
+        p->y[i] += dt * p->vy[i]; // 4
+        p->z[i] += dt * p->vz[i]; // 6
     }
 }
 
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f32 h1 = (f32)(n) * (f32)(n - 1);
         // GFLOPS
-        const f32 h2 = (23.0 * h1 + 3.0 * (f32)n) * 1e-9;
+        const f32 h2 = (25.0 * h1 + 6.0 * (f32)n) * 1e-9;
 
         if (i >= warmup) {
             rate += h2 / (end - start);

@@ -52,6 +52,7 @@ void move_particles(f32 *x, f32 *y, f32 *z,
         __m256 vsoft = _mm256_load_ps(softening);
         __m256 vdt   = _mm256_load_ps(dt);
 
+        // 25 floating-point operations
         #pragma omp for
         for (u64 i = 0; i < n; i++) {
             __m256 fx = _mm256_setzero_ps();
@@ -73,49 +74,49 @@ void move_particles(f32 *x, f32 *y, f32 *z,
                 pzj = _mm256_loadu_ps(z + j);
 
                 // From here: p_i = d_, p_j = d_^2
-                pxi = _mm256_sub_ps(pxj, pxi);
-                pyi = _mm256_sub_ps(pyj, pyi);
-                pzi = _mm256_sub_ps(pzj, pzi);
+                pxi = _mm256_sub_ps(pxj, pxi); // 1
+                pyi = _mm256_sub_ps(pyj, pyi); // 2
+                pzi = _mm256_sub_ps(pzj, pzi); // 3
 
-                pxj = _mm256_mul_ps(pxi, pxi);
-                pyj = _mm256_mul_ps(pyi, pyi);
-                pzj = _mm256_mul_ps(pzi, pzi);
+                pxj = _mm256_mul_ps(pxi, pxi); // 4
+                pyj = _mm256_mul_ps(pyi, pyi); // 5
+                pzj = _mm256_mul_ps(pzi, pzi); // 6
 
-                d_2 = _mm256_add_ps(pxj, pyj);
-                d_2 = _mm256_add_ps(d_2, pzj);
-                d_2 = _mm256_add_ps(d_2, vsoft);
-                d_2 = _mm256_rsqrt_ps(d_2);
-                tmp = _mm256_mul_ps(d_2, d_2);
-                d_2 = _mm256_mul_ps(tmp, d_2);
+                d_2 = _mm256_add_ps(pxj, pyj); // 7
+                d_2 = _mm256_add_ps(d_2, pzj); // 8
+                d_2 = _mm256_add_ps(d_2, vsoft); // 9
+                d_2 = _mm256_rsqrt_ps(d_2); // 11
+                tmp = _mm256_mul_ps(d_2, d_2); // 12
+                d_2 = _mm256_mul_ps(tmp, d_2); // 13
 
-                fx = _mm256_fmadd_ps(pxi, d_2, fx);
-                fy = _mm256_fmadd_ps(pyi, d_2, fy);
-                fz = _mm256_fmadd_ps(pzi, d_2, fz);
+                fx = _mm256_fmadd_ps(pxi, d_2, fx); // 15
+                fy = _mm256_fmadd_ps(pyi, d_2, fy); // 17
+                fz = _mm256_fmadd_ps(pzi, d_2, fz); // 19
             }
 
-            vxi = _mm256_fmadd_ps(vdt, fx, vxi);
-            vyi = _mm256_fmadd_ps(vdt, fy, vyi);
-            vzi = _mm256_fmadd_ps(vdt, fz, vzi);
+            vxi = _mm256_fmadd_ps(vdt, fx, vxi); // 21
+            vyi = _mm256_fmadd_ps(vdt, fy, vyi); // 23
+            vzi = _mm256_fmadd_ps(vdt, fz, vzi); // 25
 
             _mm256_storeu_ps(vx + i, vxi);
             _mm256_storeu_ps(vy + i, vyi);
             _mm256_storeu_ps(vz + i, vzi);
         }
 
-        // 3 floating-point operations
+        // 6 floating-point operations
         #pragma omp for
         for (u64 i = 0; i < n; i += 8) {
             // Reload v_i values
-        	pxi = _mm256_loadu_ps(x + i);
-        	pyi = _mm256_loadu_ps(y + i);
-        	pzi = _mm256_loadu_ps(z + i);
-        	vxi = _mm256_loadu_ps(vx + i);
-        	vyi = _mm256_loadu_ps(vy + i);
-        	vzi = _mm256_loadu_ps(vz + i);
+            pxi = _mm256_loadu_ps(x + i);
+            pyi = _mm256_loadu_ps(y + i);
+            pzi = _mm256_loadu_ps(z + i);
+            vxi = _mm256_loadu_ps(vx + i);
+            vyi = _mm256_loadu_ps(vy + i);
+            vzi = _mm256_loadu_ps(vz + i);
 
-            pxi = _mm256_fmadd_ps(vdt, vxi, pxi);
-            pyi = _mm256_fmadd_ps(vdt, vyi, pyi);
-            pzi = _mm256_fmadd_ps(vdt, vzi, pzi);
+            pxi = _mm256_fmadd_ps(vdt, vxi, pxi); // 2
+            pyi = _mm256_fmadd_ps(vdt, vyi, pyi); // 4
+            pzi = _mm256_fmadd_ps(vdt, vzi, pzi); // 6
 
             _mm256_storeu_ps(x + i, pxi);
             _mm256_storeu_ps(y + i, pyi);
@@ -162,7 +163,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f32 h1 = (f32)(n) * (f32)(n - 1);
         // GFLOPS
-        const f32 h2 = (23.0 * h1 + 3.0 * (f32)n) * 1e-9;
+        const f32 h2 = (25.0 * h1 + 6.0 * (f32)n) * 1e-9;
 
         if (i >= warmup) {
         	rate += h2 / (end - start);

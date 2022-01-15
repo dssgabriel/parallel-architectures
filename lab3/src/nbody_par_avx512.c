@@ -52,6 +52,7 @@ void move_particles(f32 *x, f32 *y, f32 *z,
         __m512 vsoft = _mm512_load_ps(softening);
         __m512 vdt   = _mm512_load_ps(dt);
 
+        // 25 floating-point operations
         #pragma omp for
         for (u64 i = 0; i < n; i++) {
             __m512 fx = _mm512_setzero_ps();
@@ -72,53 +73,53 @@ void move_particles(f32 *x, f32 *y, f32 *z,
                 pzj = _mm512_loadu_ps(z + j);
 
                 // From here: p_i = d_, p_j = d_^2
-                pxi = _mm512_sub_ps(pxj, pxi);
-                pyi = _mm512_sub_ps(pyj, pyi);
-                pzi = _mm512_sub_ps(pzj, pzi);
+                pxi = _mm512_sub_ps(pxj, pxi); // 1
+                pyi = _mm512_sub_ps(pyj, pyi); // 2
+                pzi = _mm512_sub_ps(pzj, pzi); // 3
 
-                pxj = _mm512_mul_ps(pxi, pxi);
-                pyj = _mm512_mul_ps(pyi, pyi);
-                pzj = _mm512_mul_ps(pzi, pzi);
+                pxj = _mm512_mul_ps(pxi, pxi); // 4
+                pyj = _mm512_mul_ps(pyi, pyi); // 5
+                pzj = _mm512_mul_ps(pzi, pzi); // 6
 
-                d_2 = _mm512_add_ps(pxj, pyj);
-                d_2 = _mm512_add_ps(d_2, pzj);
-                d_2 = _mm512_add_ps(d_2, vsoft);
+                d_2 = _mm512_add_ps(pxj, pyj); // 7
+                d_2 = _mm512_add_ps(d_2, pzj); // 8
+                d_2 = _mm512_add_ps(d_2, vsoft); // 9
             #if __AVX512ER__
-                d_2 = _mm512_rsqrt28_ps(d_2);
+                d_2 = _mm512_rsqrt28_ps(d_2); // 11
             #else
-                d_2 = _mm512_rsqrt14_ps(d_2);
+                d_2 = _mm512_rsqrt14_ps(d_2); // 11
             #endif
-                tmp = _mm512_mul_ps(d_2, d_2);
-                d_2 = _mm512_mul_ps(tmp, d_2);
+                tmp = _mm512_mul_ps(d_2, d_2); // 12
+                d_2 = _mm512_mul_ps(tmp, d_2); // 13
 
-                fx = _mm512_fmadd_ps(pxi, d_2, fx);
-                fy = _mm512_fmadd_ps(pyi, d_2, fy);
-                fz = _mm512_fmadd_ps(pzi, d_2, fz);
+                fx = _mm512_fmadd_ps(pxi, d_2, fx); // 15
+                fy = _mm512_fmadd_ps(pyi, d_2, fy); // 17
+                fz = _mm512_fmadd_ps(pzi, d_2, fz); // 19
             }
 
-            vxi = _mm512_fmadd_ps(vdt, fx, vxi);
-            vyi = _mm512_fmadd_ps(vdt, fy, vyi);
-            vzi = _mm512_fmadd_ps(vdt, fz, vzi);
+            vxi = _mm512_fmadd_ps(vdt, fx, vxi); // 21
+            vyi = _mm512_fmadd_ps(vdt, fy, vyi); // 23
+            vzi = _mm512_fmadd_ps(vdt, fz, vzi); // 25
 
             _mm512_storeu_ps(vx + i, vxi);
             _mm512_storeu_ps(vy + i, vyi);
             _mm512_storeu_ps(vz + i, vzi);
         }
 
-        // 3 floating-point operations
+        // 6 floating-point operations
         #pragma omp for
         for (u64 i = 0; i < n; i += 16) {
             // Reload v_i values
-        	pxi = _mm512_loadu_ps(x + i);
-        	pyi = _mm512_loadu_ps(y + i);
-        	pzi = _mm512_loadu_ps(z + i);
-        	vxi = _mm512_loadu_ps(vx + i);
-        	vyi = _mm512_loadu_ps(vy + i);
-        	vzi = _mm512_loadu_ps(vz + i);
+            pxi = _mm512_loadu_ps(x + i);
+            pyi = _mm512_loadu_ps(y + i);
+            pzi = _mm512_loadu_ps(z + i);
+            vxi = _mm512_loadu_ps(vx + i);
+            vyi = _mm512_loadu_ps(vy + i);
+            vzi = _mm512_loadu_ps(vz + i);
 
-            pxi = _mm512_fmadd_ps(vdt, vxi, pxi);
-            pyi = _mm512_fmadd_ps(vdt, vyi, pyi);
-            pzi = _mm512_fmadd_ps(vdt, vzi, pzi);
+            pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 2
+            pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 4
+            pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 6
 
             _mm512_storeu_ps(x + i, pxi);
             _mm512_storeu_ps(y + i, pyi);
@@ -165,7 +166,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f32 h1 = (f32)(n) * (f32)(n - 1);
         // GFLOPS
-        const f32 h2 = (23.0 * h1 + 3.0 * (f32)n) * 1e-9;
+        const f32 h2 = (25.0 * h1 + 6.0 * (f32)n) * 1e-9;
 
         if (i >= warmup) {
         	rate += h2 / (end - start);
