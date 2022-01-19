@@ -1,11 +1,13 @@
 # Directories to ignore
-**/target/
 **/bench/
 **/maqao/
 **/data/
 **/opt_reports/
+**/scripts/
+**/target/
 
 # Files to ignore
 **/*.html
 **/*.tar
+**/config.lua
 *.pdf
