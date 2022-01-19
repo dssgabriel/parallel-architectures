@@ -2,6 +2,7 @@
 **/target/
 **/bench/
 **/maqao/
+**/data/
 **/opt_reports/
 
 # Files to ignore
