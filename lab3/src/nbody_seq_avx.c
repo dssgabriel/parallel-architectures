@@ -119,6 +119,12 @@ void move_particles(f32 *x, f32 *y, f32 *z,
     }
 }
 
+void particles_print(f32 *x, f32 *y, f32 *z, u64 n)
+{
+    for (usize i = 0; i < n; i++)
+        printf("%e %e %e\n", x[i], y[i], z[i]);
+}
+
 int main(int argc, char **argv)
 {
     const u64 n = (argc > 1) ? atoll(argv[1]) : 16384;
@@ -142,11 +148,13 @@ int main(int argc, char **argv)
     init(x, y,z, vx, vy, vz, softening, softening_value, dt, dt_value, n);
 
     const u64 sp = 6 * sizeof(f64) * n;
-    printf("\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
-           sp, (f64)sp / 1024.0f, (f64)sp / 1048576.0f);
-    printf("\033[1m%5s %10s %10s %8s\033[0m\n",
-           "Step", "Time, s", "Interact/s", "GFLOP/s");
-    fflush(stdout);
+    fprintf(stderr,
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
+            sp, (f64)sp / 1024.0f, (f64)sp / 1048576.0f);
+    fprintf(stderr,
+            "\033[1m%5s %10s %10s %8s\033[0m\n",
+            "Step", "Time, s", "Interact/s", "GFLOP/s");
+    fflush(stderr);
 
     for (u64 i = 0; i < steps; i++) {
         // Measure
@@ -164,22 +172,25 @@ int main(int argc, char **argv)
         	drate += (h2 * h2) / ((end - start) * (end - start));
         }
 
-        printf("%5llu %10.3e %10.3e %8.1f %s\n",
-               i,
-               (end - start),
-               h1 / (end - start),
-               h2 / (end - start),
-               (i < warmup) ? "*" : "");
-        fflush(stdout);
+        fprintf(stderr,
+                "%5llu %10.3e %10.3e %8.1f %s\n",
+                i + 1,
+                (end - start),
+                h1 / (end - start),
+                h2 / (end - start),
+                (i < warmup) ? "*" : "");
+        fflush(stderr);
+
+        particles_print(x, y, z, n);
     }
 
     rate /= (f64)(steps - warmup);
     drate = sqrtl(drate / (f64)(steps - warmup) - (rate * rate));
 
-    printf("-----------------------------------------------------\n");
-    printf("\033[1m%s %4s \033[42m%10.1lf +- %.1lf GFLOP/s\033[0m\n",
+    fprintf(stderr, "-----------------------------------------------------\n");
+    fprintf(stderr, "\033[1m%s %4s \033[42m%10.1lf +- %.1lf GFLOP/s\033[0m\n",
            "Average performance:", "", rate, drate);
-    printf("-----------------------------------------------------\n");
+    fprintf(stderr, "-----------------------------------------------------\n");
 
     free(x);
     free(y);
