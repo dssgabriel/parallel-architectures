@@ -2,67 +2,80 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "types.h"
+#include "utils.h"
 
-typedef struct particle_s {
-    f32 *x, *y, *z;
-    f32 *vx, *vy, *vz;
-} particle_t;
+typedef struct particles_s {
+    real *px, *py, *pz;
+    real *vx, *vy, *vz;
+} particles_t;
 
-particle_t *init(u64 n)
+particles_t *particles_new(const u64 nb_bodies)
 {
-    particle_t *p = aligned_alloc(64, sizeof(particle_t));
+    particles_t *p = aligned_alloc(64, nb_bodies * sizeof(particles_t));
+    if (!p)
+        goto particles_failed_alloc;
 
-    p->x = aligned_alloc(64, n * sizeof(f32));
-    p->y = aligned_alloc(64, n * sizeof(f32));
-    p->z = aligned_alloc(64, n * sizeof(f32));
-
-    p->vx = aligned_alloc(64, n * sizeof(f32));
-    p->vy = aligned_alloc(64, n * sizeof(f32));
-    p->vz = aligned_alloc(64, n * sizeof(f32));
-
-    for (u64 i = 0; i < n; i++) {
-        u64 r1 = (u64)rand();
-        u64 r2 = (u64)rand();
-        f32 sign = (r1 > r2) ? 1 : -1;
-
-        p->x[i] = sign * (f32)rand() / (f32)RAND_MAX;
-        p->y[i] = (f32)rand() / (f32)RAND_MAX;
-        p->z[i] = sign * (f32)rand() / (f32)RAND_MAX;
-
-        p->vx[i] = (f32)rand() / (f32)RAND_MAX;
-        p->vy[i] = sign * (f32)rand() / (f32)RAND_MAX;
-        p->vz[i] = (f32)rand() / (f32)RAND_MAX;
-    }
+    p->px = aligned_alloc(64, nb_bodies * sizeof(real));
+    p->py = aligned_alloc(64, nb_bodies * sizeof(real));
+    p->pz = aligned_alloc(64, nb_bodies * sizeof(real));
+    p->vx = aligned_alloc(64, nb_bodies * sizeof(real));
+    p->vy = aligned_alloc(64, nb_bodies * sizeof(real));
+    p->vz = aligned_alloc(64, nb_bodies * sizeof(real));
+    if (!p->px || !p->py || !p->pz || !p->px || !p->py || !p->pz)
+        goto particles_failed_alloc;
 
     return p;
+
+particles_failed_alloc:
+    return NULL;
 }
 
-void move_particles(particle_t *p, const f32 dt, u64 n)
+void particles_init(particles_t *p, const u64 nb_bodies)
 {
-    static const f32 softening = 1e-20;
+    srand(0);
 
-    for (u64 i = 0; i < n; i++) {
-        f32 fx = 0.0f;
-        f32 fy = 0.0f;
-        f32 fz = 0.0f;
+    for (u64 i = 0; i < nb_bodies; i++) {
+        u64 r1 = (u64)rand();
+        u64 r2 = (u64)rand();
+        real sign = (r1 > r2) ? 1 : -1;
 
-        const f32 pxi = p->x[i];
-        const f32 pyi = p->y[i];
-        const f32 pzi = p->z[i];
+        p->px[i] = sign * (real)rand() / (real)RAND_MAX;
+        p->py[i] = (real)rand() / (real)RAND_MAX;
+        p->pz[i] = sign * (real)rand() / (real)RAND_MAX;
+
+        p->vx[i] = (real)rand() / (real)RAND_MAX;
+        p->vy[i] = sign * (real)rand() / (real)RAND_MAX;
+        p->vz[i] = (real)rand() / (real)RAND_MAX;
+    }
+}
+
+void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
+{
+    static const real softening = 1e-20;
+
+    for (usize i = 0; i < nb_bodies; i++) {
+        real fx = 0.0f;
+        real fy = 0.0f;
+        real fz = 0.0f;
+
+        const real pxi = p->px[i];
+        const real pyi = p->py[i];
+        const real pzi = p->pz[i];
 
         // 25 floating-point operations
-        for (u64 j = 0; j < n; j++) {
+        for (usize j = 0; j < nb_bodies; j++) {
             // Newton's law
-            const f32 dx = p->x[j] - pxi; // 1
-            const f32 dy = p->y[j] - pyi; // 2
-            const f32 dz = p->z[j] - pzi; // 3
+            const real dx = p->px[j] - pxi; // 1
+            const real dy = p->py[j] - pyi; // 2
+            const real dz = p->pz[j] - pzi; // 3
 
-            const f32 d_2 = (dx * dx) + (dy * dy) + (dz * dz) + softening; // 9
-            const f32 d_2_sqrt = sqrtf(d_2); // 10
-            const f32 d_2_rsqrt = 1.0f / d_2_sqrt; // 11
-            const f32 d_3_over_2 = d_2_rsqrt * d_2_rsqrt * d_2_rsqrt; // 13
+            const real d_2 = (dx * dx) + (dy * dy) + (dz * dz) + softening; // 9
+            const real d_2_sqrt = sqrtf(d_2); // 10
+            const real d_2_rsqrt = 1.0f / d_2_sqrt; // 11
+            const real d_3_over_2 = d_2_rsqrt * d_2_rsqrt * d_2_rsqrt; // 13
 
             // Net force
             fx += dx * d_3_over_2; // 15
@@ -76,67 +89,100 @@ void move_particles(particle_t *p, const f32 dt, u64 n)
     }
 
     // 6 floating-point operations
-    for (u64 i = 0; i < n; i++) {
-        p->x[i] += dt * p->vx[i]; // 2
-        p->y[i] += dt * p->vy[i]; // 4
-        p->z[i] += dt * p->vz[i]; // 6
+    for (usize i = 0; i < nb_bodies; i++) {
+        p->px[i] += dt * p->vx[i]; // 2
+        p->py[i] += dt * p->vy[i]; // 4
+        p->pz[i] += dt * p->vz[i]; // 6
     }
+}
+
+void particles_print(particles_t *p, const config_t cfg)
+{
+    FILE *fp;
+    if (strcmp(cfg.output, "stdout")) {
+        fp = fopen(cfg.output, "wb");
+        if (!fp) {
+            printf("warning: failed to open file %s\n", cfg.output);
+            fp = stdout;
+        }
+    } else {
+        fp = stdout;
+    }
+
+    for (usize i = 0; i < cfg.nb_bodies; i++)
+        fprintf(fp, "%e\t%e\t%e\n", p->px[i], p->py[i], p->pz[i]);
+
+    if (strcmp(cfg.output, "stdout") && fp != stdout)
+        fclose(fp);
+}
+
+void particles_drop(particles_t *p)
+{
+    free(p->px);
+    free(p->py);
+    free(p->pz);
+    free(p->vx);
+    free(p->vy);
+    free(p->vz);
+    free(p);
 }
 
 int main(int argc, char **argv)
 {
-    const u64 n = (argc > 1) ? atoll(argv[1]) : 16384;
-    const u64 steps = 10;
-    const f32 dt = 0.01;
+    config_t cfg = (argc > 1) ? config_from(argc, argv) : config_new();
+    if (cfg.debug)
+        config_print(cfg);
 
     f64 rate = 0.0, drate = 0.0;
+    particles_t *p = particles_new(cfg.nb_bodies);
+    if (!p)
+        return printf("error: failed to allocate particles\n"), 1;
+    particles_init(p, cfg.nb_bodies);
 
-    // Steps to skip for warm up
-    const u64 warmup = 3;
+    const u64 mem_size = cfg.nb_bodies * 6 * sizeof(real);
+    fprintf(stderr,
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
+            mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
+    fprintf(stderr,
+            "\033[1m%5s %10s %10s %8s\033[0m\n",
+            "Iter", "Time (s)", "Interact/s", "GFLOP/s");
+    fflush(stderr);
 
-    particle_t *p = init(n);
-    const u64 s = sizeof(particle_t) * n;
-
-    printf("\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
-           s, (f64)s / 1024.0f, (f64)s / 1048576.0f);
-    printf("\033[1m%5s %10s %10s %8s\033[0m\n",
-           "Step", "Time, s", "Interact/s", "GFLOP/s");
-    fflush(stdout);
-
-    for (u64 i = 0; i < steps; i++) {
+    for (usize i = 0; i < cfg.nb_iter; i++) {
         // Measure
         const f64 start = omp_get_wtime();
-        move_particles(p, dt, n);
+        particles_update(p, cfg.nb_bodies, cfg.dt);
         const f64 end = omp_get_wtime();
 
         // Number of interactions/iterations
-        const f32 h1 = (f32)(n) * (f32)(n - 1);
+        const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f32 h2 = (25.0 * h1 + 6.0 * (f32)n) * 1e-9;
+        const f64 h2 = (25.0f * h1 + 6.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
-        if (i >= warmup) {
+        if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);
             drate += (h2 * h2) / ((end - start) * (end - start));
 	    }
 
-        printf("%5llu %10.3e %10.3e %8.1f %s\n",
-               i,
-               (end - start),
-               h1 / (end - start),
-               h2 / (end - start),
-               (i < warmup) ? "*" : "");
-      
-        fflush(stdout);
+        fprintf(stderr,
+                "%5zu %10.3e %10.3e %8.1f %s\n",
+                i + 1,
+                (end - start),
+                h1 / (end - start),
+                h2 / (end - start),
+                (i < cfg.nb_warmups) ? "*" : "");
+        fflush(stderr);
     }
+    rate /= (f64)(cfg.nb_iter - cfg.nb_warmups);
+    drate = sqrtl(drate / (f64)(cfg.nb_iter - cfg.nb_warmups) - (rate * rate));
 
-    rate /= (f64)(steps - warmup);
-    drate = sqrt(drate / (f64)(steps - warmup) - (rate * rate));
+    fprintf(stderr, "-----------------------------------------------------\n");
+    fprintf(stderr, "\033[1m%s %4s \033[42m%10.1lf +- %.1lf GFLOP/s\033[0m\n",
+           "Average performance:", "", rate, drate);
+    fprintf(stderr, "-----------------------------------------------------\n");
 
-    printf("-----------------------------------------------------\n");
-    printf("\033[1m%s\033[30;42m      %10.1lf +- %.1lf GFLOP/s \033[0m\n",
-           "Average performance:", rate, drate);
-    printf("-----------------------------------------------------\n");
+    particles_print(p, cfg);
 
-    free(p);
+    particles_drop(p);
     return 0;
 }

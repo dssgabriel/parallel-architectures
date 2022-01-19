@@ -12,16 +12,16 @@ typedef struct particle_s {
     real vx, vy, vz;
 } particle_t;
 
-particle_t *particles_new(usize nb_bodies)
+particle_t *particles_new(const u64 nb_bodies)
 {
     return malloc(nb_bodies * sizeof(particle_t));
 }
 
-void particles_init(particle_t *p, const u64 n)
+void particles_init(particle_t *p, const u64 nb_bodies)
 {
     srand(0);
 
-    for (usize i = 0; i < n; i++) {
+    for (usize i = 0; i < nb_bodies; i++) {
         u64 r1 = (u64)rand();
         u64 r2 = (u64)rand();
         real sign = (r1 > r2) ? 1.0f : -1.0f;
@@ -36,17 +36,17 @@ void particles_init(particle_t *p, const u64 n)
     }
 }
 
-void particles_update(particle_t *p, const real dt, const u64 n)
+void particles_update(particle_t *p, const u64 nb_bodies, const real dt)
 {
     const real softening = 1e-20;
 
-    for (usize i = 0; i < n; i++) {
+    for (usize i = 0; i < nb_bodies; i++) {
         real fx = 0.0f;
         real fy = 0.0f;
         real fz = 0.0f;
 
         // 23 floating-point operations
-        for (usize j = 0; j < n; j++) {
+        for (usize j = 0; j < nb_bodies; j++) {
             // Newton's law
             const real dx = p[j].px - p[i].px; // 1
             const real dy = p[j].py - p[i].py; // 2
@@ -66,7 +66,7 @@ void particles_update(particle_t *p, const real dt, const u64 n)
     }
 
     // 6 floating-point operations
-    for (usize i = 0; i < n; i++) {
+    for (usize i = 0; i < nb_bodies; i++) {
         p[i].px += dt * p[i].vx; // 2
         p[i].py += dt * p[i].vy; // 4
         p[i].pz += dt * p[i].vz; // 6
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     for (usize i = 0; i < cfg.nb_iter; i++) {
         // Measure
         const f64 start = omp_get_wtime();
-        particles_update(p, cfg.dt, cfg.nb_bodies);
+        particles_update(p, cfg.nb_bodies, cfg.dt);
         const f64 end = omp_get_wtime();
 
         // Number of interactions/iterations
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
         fflush(stderr);
     }
     rate /= (f64)(cfg.nb_iter - cfg.nb_warmups);
-    drate = sqrt(drate / (f64)(cfg.nb_iter - cfg.nb_warmups) - (rate * rate));
+    drate = sqrtl(drate / (f64)(cfg.nb_iter - cfg.nb_warmups) - (rate * rate));
 
     fprintf(stderr, "-----------------------------------------------------\n");
     fprintf(stderr, "\033[1m%s %4s \033[42m%10.1lf +- %.1lf GFLOP/s\033[0m\n",
