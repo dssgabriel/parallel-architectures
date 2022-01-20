@@ -13,6 +13,8 @@
 ## adding the following variable definition in their make command (FP32 is   ##
 ## the default):                                                             ##
 ##   make PRECISION=-DFP64													 ##
+## Note: The variable precision has been disabled for AVX versions of the    ##
+## code (FP32 only).                                                         ##
 ## ------------------------------------------------------------------------- ##
 
 ## MAKEFILE MACROS
@@ -21,9 +23,9 @@ CLANG=clang
 ICC=icc
 ICX=icx
 
-GCC_OFLAGS=-Wall -Wextra -g3 -march=native -mtune=native -mavx2 -Ofast -finline-functions -funroll-loops -fpeel-loops -floop-interchange -ftree-vectorize -ftree-loop-vectorize -flto
-CLANG_OFLAGS=-Wall -Wextra -g3 -march=native -mtune=native -mavx2 -Ofast -finline-functions -funroll-loops
-ICC_OFLAGS=-w2 -g3 -xHost -mavx -Ofast -funroll-loops -finline-functions -flto
+GCC_OFLAGS=-Wall -Wextra -g3 -march=native -mtune=native -Ofast -finline-functions -funroll-loops -fpeel-loops -floop-interchange -ftree-vectorize -ftree-loop-vectorize -flto
+CLANG_OFLAGS=-Wall -Wextra -g3 -march=native -mtune=native -Ofast -finline-functions -funroll-loops
+ICC_OFLAGS=-w2 -g3 -xHost -mavx -Ofast -funroll-loops -finline-functions -flto -qopt-report=5 -qopt-report-file=$@.optrpt
 ICX_OFLAGS=-Wall -g3 -xHost -mavx -Ofast -funroll-loops -finline-functions -flto
 
 GCC_CLANG_LDFLAGS=-lm -fopenmp

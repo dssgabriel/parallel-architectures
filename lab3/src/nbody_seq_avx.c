@@ -8,11 +8,9 @@
 #include "types.h"
 #include "utils.h"
 
-static const usize offset = 7;
-
 typedef struct particles_s {
-    real *px, *py, *pz;
-    real *vx, *vy, *vz;
+    f32 *px, *py, *pz;
+    f32 *vx, *vy, *vz;
 } particles_t;
 
 particles_t *particles_new(const u64 nb_bodies)
@@ -21,21 +19,14 @@ particles_t *particles_new(const u64 nb_bodies)
     if (!p)
         goto particles_failed_alloc;
 
-    p->px = aligned_alloc(64, (nb_bodies + (offset * 2 + 1)) * sizeof(real));
-    p->py = aligned_alloc(64, (nb_bodies + (offset * 2 + 1)) * sizeof(real));
-    p->pz = aligned_alloc(64, (nb_bodies + (offset * 2 + 1)) * sizeof(real));
-    p->vx = aligned_alloc(64, (nb_bodies + (offset * 2 + 1)) * sizeof(real));
-    p->vy = aligned_alloc(64, (nb_bodies + (offset * 2 + 1)) * sizeof(real));
-    p->vz = aligned_alloc(64, (nb_bodies + (offset * 2 + 1)) * sizeof(real));
+    p->px = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
+    p->py = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
+    p->pz = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
+    p->vx = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
+    p->vy = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
+    p->vz = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
     if (!p->px || !p->py || !p->pz || !p->px || !p->py || !p->pz)
         goto particles_failed_alloc;
-
-    memset(p->px, 0, (nb_bodies + 15) * sizeof(real)); 
-    memset(p->py, 0, (nb_bodies + 15) * sizeof(real)); 
-    memset(p->pz, 0, (nb_bodies + 15) * sizeof(real)); 
-    memset(p->vx, 0, (nb_bodies + 15) * sizeof(real)); 
-    memset(p->vy, 0, (nb_bodies + 15) * sizeof(real)); 
-    memset(p->vz, 0, (nb_bodies + 15) * sizeof(real)); 
 
     return p;
 
@@ -47,154 +38,73 @@ void particles_init(particles_t *p, const u64 nb_bodies)
 {
     srand(0);
 
-    for (u64 i = offset; i < nb_bodies + offset; i++) {
+    for (usize i = 0; i < nb_bodies; i++) {
         u64 r1 = (u64)rand();
         u64 r2 = (u64)rand();
-        real sign = (r1 > r2) ? 1 : -1;
+        f32 sign = (r1 > r2) ? 1 : -1;
 
-        p->px[i] = sign * (real)rand() / (real)RAND_MAX;
-        p->py[i] = (real)rand() / (real)RAND_MAX;
-        p->pz[i] = sign * (real)rand() / (real)RAND_MAX;
+        p->px[i] = sign * (f32)rand() / (f32)RAND_MAX;
+        p->py[i] = (f32)rand() / (f32)RAND_MAX;
+        p->pz[i] = sign * (f32)rand() / (f32)RAND_MAX;
 
-        p->vx[i] = (real)rand() / (real)RAND_MAX;
-        p->vy[i] = sign * (real)rand() / (real)RAND_MAX;
-        p->vz[i] = (real)rand() / (real)RAND_MAX;
+        p->vx[i] = (f32)rand() / (f32)RAND_MAX;
+        p->vy[i] = sign * (f32)rand() / (f32)RAND_MAX;
+        p->vz[i] = (f32)rand() / (f32)RAND_MAX;
     }
 }
 
-#ifdef FP64
-void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
-{
-    const f256 softening = _mm256_set1_pd(1e-20);
-    const f256 vdt = _mm256_set1_pd(dt);
-    const f256 one = _mm256_set1_pd(1.0f);
-
-    // 25 floating-point operations
-    for (usize i = 0; i < nb_bodies + (offset * 2); i++) {
-        f256 fx = _mm256_setzero_pd();
-        f256 fy = _mm256_setzero_pd();
-        f256 fz = _mm256_setzero_pd();
-
-        // Load all i-bound values
-        f256 pxi = _mm256_loadu_pd(p->px + i);
-        f256 pyi = _mm256_loadu_pd(p->py + i);
-        f256 pzi = _mm256_loadu_pd(p->pz + i);
-        f256 vxi = _mm256_loadu_pd(p->vx + i);
-        f256 vyi = _mm256_loadu_pd(p->vy + i);
-        f256 vzi = _mm256_loadu_pd(p->vz + i);
-
-        for (usize j = offset; j < nb_bodies + offset; j += 4) {
-            f256 pxj = _mm256_loadu_pd(p->px + j);
-            f256 pyj = _mm256_loadu_pd(p->py + j);
-            f256 pzj = _mm256_loadu_pd(p->pz + j);
-
-            // From here: p_i = d_, p_j = d_^2
-            pxi = _mm256_sub_pd(pxj, pxi); // 1
-            pyi = _mm256_sub_pd(pyj, pyi); // 2
-            pzi = _mm256_sub_pd(pzj, pzi); // 3
-
-            pxj = _mm256_mul_pd(pxi, pxi); // 4
-            pyj = _mm256_mul_pd(pyi, pyi); // 5
-            pzj = _mm256_mul_pd(pzi, pzi); // 6
-
-            f256 d_2 = _mm256_add_pd(pxj, pyj); // 7
-            d_2 = _mm256_add_pd(d_2, pzj); // 8
-            d_2 = _mm256_add_pd(d_2, softening); // 9
-            d_2 = _mm256_sqrt_pd(d_2); // 10
-            d_2 = _mm256_div_pd(one, d_2); // 11
-            const f256 tmp = _mm256_mul_pd(d_2, d_2); // 12
-            d_2 = _mm256_mul_pd(tmp, d_2); // 13
-
-            fx = _mm256_fmadd_pd(pxi, d_2, fx); // 15
-            fy = _mm256_fmadd_pd(pyi, d_2, fy); // 17
-            fz = _mm256_fmadd_pd(pzi, d_2, fz); // 19
-        }
-
-        vxi = _mm256_fmadd_pd(vdt, fx, vxi); // 21
-        vyi = _mm256_fmadd_pd(vdt, fy, vyi); // 23
-        vzi = _mm256_fmadd_pd(vdt, fz, vzi); // 25
-
-        _mm256_storeu_pd(p->vx + i, vxi);
-        _mm256_storeu_pd(p->vy + i, vyi);
-        _mm256_storeu_pd(p->vz + i, vzi);
-    }
-
-    // 6 floating-point operations
-    for (usize i = offset; i < nb_bodies + offset; i += 4) {
-        // Reload v_i values
-    	f256 pxi = _mm256_loadu_pd(p->px + i);
-    	f256 pyi = _mm256_loadu_pd(p->py + i);
-    	f256 pzi = _mm256_loadu_pd(p->pz + i);
-    	f256 vxi = _mm256_loadu_pd(p->vx + i);
-    	f256 vyi = _mm256_loadu_pd(p->vy + i);
-    	f256 vzi = _mm256_loadu_pd(p->vz + i);
-
-        pxi = _mm256_fmadd_pd(vdt, vxi, pxi); // 2
-        pyi = _mm256_fmadd_pd(vdt, vyi, pyi); // 4
-        pzi = _mm256_fmadd_pd(vdt, vzi, pzi); // 6
-
-        _mm256_storeu_pd(p->px + i, pxi);
-        _mm256_storeu_pd(p->py + i, pyi);
-        _mm256_storeu_pd(p->pz + i, pzi);
-    }
-}
-#else
-void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
+void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
 {
     const f256 softening = _mm256_set1_ps(1e-20);
     const f256 vdt = _mm256_set1_ps(dt);
 
-    // 25 floating-point operations
-    for (usize i = 0; i < nb_bodies + (offset * 2); i++) {
+    // 6 floating-point operations
+    for (usize i = 0; i < nb_bodies; i++) {
         f256 fx = _mm256_setzero_ps();
         f256 fy = _mm256_setzero_ps();
         f256 fz = _mm256_setzero_ps();
 
         // Load all i-bound values
-        f256 pxi = _mm256_loadu_ps(p->px + i);
-        f256 pyi = _mm256_loadu_ps(p->py + i);
-        f256 pzi = _mm256_loadu_ps(p->pz + i);
-        f256 vxi = _mm256_loadu_ps(p->vx + i);
-        f256 vyi = _mm256_loadu_ps(p->vy + i);
-        f256 vzi = _mm256_loadu_ps(p->vz + i);
+        f256 pxi = _mm256_set1_ps(p->px[i]);
+        f256 pyi = _mm256_set1_ps(p->py[i]);
+        f256 pzi = _mm256_set1_ps(p->pz[i]);
+        f256 vxi = _mm256_set1_ps(p->vx[i]);
+        f256 vyi = _mm256_set1_ps(p->vy[i]);
+        f256 vzi = _mm256_set1_ps(p->vz[i]);
 
-        for (usize j = 0; j < nb_bodies + (offset * 2); j += 8) {
-            f256 pxj = _mm256_loadu_ps(p->px + j);
-            f256 pyj = _mm256_loadu_ps(p->py + j);
-            f256 pzj = _mm256_loadu_ps(p->pz + j);
-
+        // 19 floating-point operations
+        for (usize j = 0; j < nb_bodies; j += 8) {
             // From here: p_i = d_, p_j = d_^2
-            pxi = _mm256_sub_ps(pxj, pxi); // 1
-            pyi = _mm256_sub_ps(pyj, pyi); // 2
-            pzi = _mm256_sub_ps(pzj, pzi); // 3
+            const f256 dx = _mm256_sub_ps(_mm256_loadu_ps(p->px + j), pxi); // 1
+            const f256 dy = _mm256_sub_ps(_mm256_loadu_ps(p->py + j), pyi); // 2
+            const f256 dz = _mm256_sub_ps(_mm256_loadu_ps(p->pz + j), pzi); // 3
 
-            pxj = _mm256_mul_ps(pxi, pxi); // 4
-            pyj = _mm256_mul_ps(pyi, pyi); // 5
-            pzj = _mm256_mul_ps(pzi, pzi); // 6
+            const f256 d_2 =
+                _mm256_add_ps(
+                    _mm256_add_ps(
+                        _mm256_add_ps(
+                            _mm256_mul_ps(dx, dx),
+                            _mm256_mul_ps(dy, dy)
+                        ),
+                        _mm256_mul_ps(dz, dz)
+                    ),
+                    softening); // 9
 
-            f256 d_2 = _mm256_add_ps(pxj, pyj); // 7
-            d_2 = _mm256_add_ps(d_2, pzj); // 8
-            d_2 = _mm256_add_ps(d_2, softening); // 9
-            d_2 = _mm256_rsqrt_ps(d_2); // 11
-            const f256 tmp = _mm256_mul_ps(d_2, d_2); // 12
-            d_2 = _mm256_mul_ps(tmp, d_2); // 13
+            const f256 invd = _mm256_rsqrt_ps(d_2); // 11
+            const f256 invd_3 = _mm256_mul_ps(_mm256_mul_ps(invd, invd), invd); // 13
 
-            fx = _mm256_fmadd_ps(pxi, d_2, fx); // 15
-            fy = _mm256_fmadd_ps(pyi, d_2, fy); // 17
-            fz = _mm256_fmadd_ps(pzi, d_2, fz); // 19
+            fx = _mm256_fmadd_ps(dx, invd_3, fx); // 15
+            fy = _mm256_fmadd_ps(dy, invd_3, fy); // 17
+            fz = _mm256_fmadd_ps(dz, invd_3, fz); // 19
         }
 
-        vxi = _mm256_fmadd_ps(vdt, fx, vxi); // 21
-        vyi = _mm256_fmadd_ps(vdt, fy, vyi); // 23
-        vzi = _mm256_fmadd_ps(vdt, fz, vzi); // 25
-
-        _mm256_storeu_ps(p->vx + i, vxi);
-        _mm256_storeu_ps(p->vy + i, vyi);
-        _mm256_storeu_ps(p->vz + i, vzi);
+        p->vx[i] = _mm256_cvtss_f32(_mm256_fmadd_ps(vdt, fx, vxi)); // 2
+        p->vy[i] = _mm256_cvtss_f32(_mm256_fmadd_ps(vdt, fy, vyi)); // 4
+        p->vz[i] = _mm256_cvtss_f32(_mm256_fmadd_ps(vdt, fz, vzi)); // 6
     }
 
     // 6 floating-point operations
-    for (usize i = offset; i < nb_bodies + offset; i += 8) {
+    for (usize i = 0; i < nb_bodies; i += 8) {
         // Reload v_i values
     	f256 pxi = _mm256_loadu_ps(p->px + i);
     	f256 pyi = _mm256_loadu_ps(p->py + i);
@@ -203,16 +113,15 @@ void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
     	f256 vyi = _mm256_loadu_ps(p->vy + i);
     	f256 vzi = _mm256_loadu_ps(p->vz + i);
 
-        pxi = _mm256_fmadd_ps(vdt, vxi, pxi); // 2
-        pyi = _mm256_fmadd_ps(vdt, vyi, pyi); // 4
-        pzi = _mm256_fmadd_ps(vdt, vzi, pzi); // 6
+        pxi = _mm256_fmadd_ps(vdt, vxi, pxi); // 8
+        pyi = _mm256_fmadd_ps(vdt, vyi, pyi); // 10
+        pzi = _mm256_fmadd_ps(vdt, vzi, pzi); // 12
 
         _mm256_storeu_ps(p->px + i, pxi);
         _mm256_storeu_ps(p->py + i, pyi);
         _mm256_storeu_ps(p->pz + i, pzi);
     }
 }
-#endif
 
 void particles_print(particles_t *p, const config_t cfg)
 {
@@ -227,13 +136,8 @@ void particles_print(particles_t *p, const config_t cfg)
         fp = stdout;
     }
 
-    if (sizeof(real) == 4) {
-        for (usize i = 0; i < cfg.nb_bodies; i++)
-            fprintf(fp, "%.8e\t%.8e\t%.8e\n", p->px[i], p->py[i], p->pz[i]);
-    } else {
-        for (usize i = 0; i < cfg.nb_bodies; i++)
-            fprintf(fp, "%.16e\t%.16e\t%.16e\n", p->px[i], p->py[i], p->pz[i]);
-    }
+    for (usize i = 0; i < cfg.nb_bodies; i++)
+        fprintf(fp, "%.8e\t%.8e\t%.8e\n", p->px[i], p->py[i], p->pz[i]);
 
     if (strcmp(cfg.output, "stdout") && fp != stdout)
         fclose(fp);
@@ -262,7 +166,7 @@ int main(int argc, char **argv)
         return printf("error: failed to allocate particles\n"), 1;
     particles_init(p, cfg.nb_bodies);
 
-    const u64 mem_size = cfg.nb_bodies * 6 * sizeof(real);
+    const u64 mem_size = cfg.nb_bodies * 6 * sizeof(f32);
     fprintf(stderr,
             "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
             mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
@@ -280,7 +184,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f64 h2 = (25.0f * h1 + 6.0f * (f64)(cfg.nb_bodies)) * 1e-9;
+        const f64 h2 = (19.0f * h1 + 12.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
         if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);

@@ -56,12 +56,13 @@ void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
 {
     const real softening = 1e-20;
 
+    // 6 floating-point operations
     for (usize i = 0; i < nb_bodies; i++) {
         real fx = 0.0f;
         real fy = 0.0f;
         real fz = 0.0f;
 
-        // 23 floating-point operations
+        // 17 floating-point operations
         for (usize j = 0; j < nb_bodies; j++) {
             // Newton's law
             const real dx = p->px[j] - p->px[i]; // 1
@@ -76,16 +77,16 @@ void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
             fz += dz / d_3_over_2; // 17
     	}
 
-        p->vx[i] += dt * fx; // 19
-        p->vy[i] += dt * fy; // 21
-        p->vz[i] += dt * fz; // 23
+        p->vx[i] += dt * fx; // 2
+        p->vy[i] += dt * fy; // 4
+        p->vz[i] += dt * fz; // 6
     }
 
     // 6 floating-point operations
     for (usize i = 0; i < nb_bodies; i++) {
-        p->px[i] += dt * p->vx[i]; // 2
-        p->py[i] += dt * p->vy[i]; // 4
-        p->pz[i] += dt * p->vz[i]; // 6
+        p->px[i] += dt * p->vx[i]; // 8
+        p->py[i] += dt * p->vy[i]; // 10
+        p->pz[i] += dt * p->vz[i]; // 12
     }
 }
 
@@ -155,7 +156,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f64 h2 = (23.0f * h1 + 6.0f * (f64)(cfg.nb_bodies)) * 1e-9;
+        const f64 h2 = (17.0f * h1 + 12.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
         if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);
