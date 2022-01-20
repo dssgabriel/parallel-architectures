@@ -1,6 +1,4 @@
-#/bin/python
-
-import functools
+import numpy as np
 import statistics
 import sys
 from pathlib import Path
@@ -39,22 +37,49 @@ def read_files(ref, out):
 
 
 def process_files(ref, out):
-    deltas = []
     for i in range(0, len(ref)):
         ref[i] = [float(x) for x in ref[i]]
         out[i] = [float(x) for x in out[i]]
-        functools.reduce(lambda x, y: x+y, ref[i])
-        functools.reduce(lambda x, y: x+y, out[i])
-        ref[i] = ref[i][0]
-        out[i] = out[i][0]
-        deltas.append(ref[i] - out[i])
-
-    return deltas
 
 
-def compute_stats(deltas):
-    mean = statistics.fmean(deltas)
-    return mean
+def compute_stats(ref, out):
+    norm1 = 0.0
+    norm2 = 0.0
+
+    max = 0.0
+    min = np.inf
+
+    for i in range(0, len(ref)):
+        x1 = abs(ref[i][0] - out[i][0])
+        y1 = abs(ref[i][1] - out[i][1])
+        z1 = abs(ref[i][2] - out[i][2])
+        x2 = (ref[i][0] - out[i][0]) * (ref[i][0] - out[i][0])
+        y2 = (ref[i][1] - out[i][1]) * (ref[i][1] - out[i][1])
+        z2 = (ref[i][2] - out[i][2]) * (ref[i][2] - out[i][2])
+
+        sum1 = x1 + y1 + z1
+        sum2 = x2 + y2 + z2
+
+        if sum1 > max:
+            max = sum1
+
+        if sum1 < min:
+            min = sum1
+
+        norm1 += sum1
+        norm2 += np.sqrt(sum2)
+
+    print(f"Maximum variation is: {max}")
+    print(f"Minimum variation is: {min}")
+    print(f"Error in 1-norm: {norm1 / len(ref)}")
+    print(f"Error in 2-norm: {norm2 / len(ref)}")
+    
+    # maxd = max(deltas)
+    # mind = min(deltas)
+    # mean = statistics.mean(deltas)
+    # print(f"Maximum precision loss: {maxd}")
+    # print(f"Minimum precision loss: {mind}")
+    # print(f"Average precision loss: {abs(mean)}")
 
 
 def main():
@@ -70,10 +95,8 @@ def main():
     out_file = open(out, "r")
 
     ref_contents, out_contents = read_files(ref_file, out_file)
-    deltas = process_files(ref_contents, out_contents)
-    mean = compute_stats(deltas)
-
-    print(f"Average precision loss from reference: {mean}")
+    process_files(ref_contents, out_contents)
+    compute_stats(ref_contents, out_contents)
    
 if __name__ == "__main__":
     main()

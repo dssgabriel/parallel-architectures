@@ -6,8 +6,12 @@
 
 #ifdef FP64
     typedef f64 real;
+    typedef __m256d f256;
+    typedef __m512d f512;
 #else
     typedef f32 real;
+    typedef __m256 f256;
+    typedef __m512 f512;
 #endif
 
 typedef struct {

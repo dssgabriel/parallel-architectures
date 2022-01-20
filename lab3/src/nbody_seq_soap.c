@@ -109,8 +109,13 @@ void particles_print(particles_t *p, const config_t cfg)
         fp = stdout;
     }
 
-    for (usize i = 0; i < cfg.nb_bodies; i++)
-        fprintf(fp, "%e\t%e\t%e\n", p->px[i], p->py[i], p->pz[i]);
+    if (sizeof(real) == 4) {
+        for (usize i = 0; i < cfg.nb_bodies; i++)
+            fprintf(fp, "%.8e\t%.8e\t%.8e\n", p->px[i], p->py[i], p->pz[i]);
+    } else {
+        for (usize i = 0; i < cfg.nb_bodies; i++)
+            fprintf(fp, "%.16e\t%.16e\t%.16e\n", p->px[i], p->py[i], p->pz[i]);
+    }
 
     if (strcmp(cfg.output, "stdout") && fp != stdout)
         fclose(fp);

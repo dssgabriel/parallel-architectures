@@ -31,11 +31,11 @@ ICC_ICX_LDFLAGS=-qmkl -qopenmp
 
 
 ## MAKEFILE RULES
-all: 0 seq par
+all: base seq par
 
-seq: 0 _soa _seq_soap _seq_avx _seq_avx512
+seq: base soa seq_soap seq_avx seq_avx512
 
-par: _par_soap _par_avx _par_avx512
+par: par_soap par_avx par_avx512
 
 gcc: target/gcc/nbody0 target/gcc/nbody_soa target/gcc/nbody_seq_soap target/gcc/nbody_par_soap target/gcc/nbody_seq_avx target/gcc/nbody_par_avx target/gcc/nbody_seq_avx512 target/gcc/nbody_par_avx512
 
@@ -45,28 +45,28 @@ icc: target/icc/nbody0  target/icc/nbody_soa target/icc/nbody_seq_soap target/ic
 
 icx: target/icx/nbody0  target/icx/nbody_soa target/icx/nbody_seq_soap target/icx/nbody_par_soap target/icx/nbody_seq_avx target/icx/nbody_par_avx target/icx/nbody_seq_avx512 target/icx/nbody_par_avx512
 
-0: target/gcc/nbody0 target/clang/nbody0 target/icc/nbody0 target/icx/nbody0
+base: target/gcc/nbody0 target/clang/nbody0 target/icc/nbody0 target/icx/nbody0
 
-_soa: target/gcc/nbody_soa target/clang/nbody_soa target/icc/nbody_soa target/icx/nbody_soa
+soa: target/gcc/nbody_soa target/clang/nbody_soa target/icc/nbody_soa target/icx/nbody_soa
 
-_seq_soap: target/gcc/nbody_seq_soap target/clang/nbody_seq_soap target/icc/nbody_seq_soap target/icx/nbody_seq_soap
+seq_soap: target/gcc/nbody_seq_soap target/clang/nbody_seq_soap target/icc/nbody_seq_soap target/icx/nbody_seq_soap
 
-_par_soap: target/gcc/nbody_par_soap target/clang/nbody_par_soap target/icc/nbody_par_soap target/icx/nbody_par_soap
+par_soap: target/gcc/nbody_par_soap target/clang/nbody_par_soap target/icc/nbody_par_soap target/icx/nbody_par_soap
 
-_seq_avx: target/gcc/nbody_seq_avx target/clang/nbody_seq_avx target/icc/nbody_seq_avx target/icx/nbody_seq_avx
+seq_avx: target/gcc/nbody_seq_avx target/clang/nbody_seq_avx target/icc/nbody_seq_avx target/icx/nbody_seq_avx
 
-_par_avx: target/gcc/nbody_par_avx target/clang/nbody_par_avx target/icc/nbody_par_avx target/icx/nbody_par_avx
+par_avx: target/gcc/nbody_par_avx target/clang/nbody_par_avx target/icc/nbody_par_avx target/icx/nbody_par_avx
 
-_seq_avx512: target/gcc/nbody_seq_avx512 target/clang/nbody_seq_avx512 target/icc/nbody_seq_avx512 target/icx/nbody_seq_avx512
+seq_avx512: target/gcc/nbody_seq_avx512 target/clang/nbody_seq_avx512 target/icc/nbody_seq_avx512 target/icx/nbody_seq_avx512
 
-_par_avx512: target/gcc/nbody_par_avx512 target/clang/nbody_par_avx512 target/icc/nbody_par_avx512 target/icx/nbody_par_avx512
+par_avx512: target/gcc/nbody_par_avx512 target/clang/nbody_par_avx512 target/icc/nbody_par_avx512 target/icx/nbody_par_avx512
 
 
 ## COMPILATION TARGETS
 ref: src/nbody0.c src/utils.c
 	@mkdir -p target/
-	$(CLANG) -DFP64 -g3 -ffp-model=precise -march=native -mtune=native -O2 -mno-avx $^ -o target/$@ $(GCC_CLANG_LDFLAGS)
-	target/ref $(PARAMS) -o data/ref.dat
+	$(CLANG) $(PRECISION) -g3 -ffp-model=precise -march=native -mtune=native -O2 -mno-avx $^ -o target/$@ $(GCC_CLANG_LDFLAGS)
+	target/ref $(PARAMS) -d -o data/ref.dat
 
 target/gcc/nbody%: src/nbody%.c src/utils.c
 	@mkdir -p target/gcc/

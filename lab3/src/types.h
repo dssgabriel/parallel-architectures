@@ -15,8 +15,6 @@ typedef long long           i64;
 
 typedef float               f32;
 typedef double              f64;
-typedef __m256              f256;
-typedef __m512              f512;
 
 typedef size_t              usize;
 typedef ssize_t             isize;
