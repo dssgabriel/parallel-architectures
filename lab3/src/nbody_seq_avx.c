@@ -8,6 +8,17 @@
 #include "types.h"
 #include "utils.h"
 
+static inline
+f32 hsum(const f256 x)
+{
+    f256 t1 = _mm256_hadd_ps(x, x);
+    f256 t2 = _mm256_hadd_ps(t1, t1);
+    f128 t3 = _mm256_extractf128_ps(t2, 1);
+    f128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
+
+    return _mm_cvtss_f32(t4);
+}
+
 typedef struct particles_s {
     f32 *px, *py, *pz;
     f32 *vx, *vy, *vz;
@@ -68,9 +79,6 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
         f256 pxi = _mm256_set1_ps(p->px[i]);
         f256 pyi = _mm256_set1_ps(p->py[i]);
         f256 pzi = _mm256_set1_ps(p->pz[i]);
-        f256 vxi = _mm256_set1_ps(p->vx[i]);
-        f256 vyi = _mm256_set1_ps(p->vy[i]);
-        f256 vzi = _mm256_set1_ps(p->vz[i]);
 
         // 19 floating-point operations
         for (usize j = 0; j < nb_bodies; j += 8) {
@@ -90,17 +98,20 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
                     ),
                     softening); // 9
 
-            const f256 invd = _mm256_rsqrt_ps(d_2); // 11
-            const f256 invd_3 = _mm256_mul_ps(_mm256_mul_ps(invd, invd), invd); // 13
+            f256 invd = _mm256_rsqrt_ps(d_2); // 11
+            invd = _mm256_mul_ps(_mm256_mul_ps(invd, invd), invd); // 13
 
-            fx = _mm256_fmadd_ps(dx, invd_3, fx); // 15
-            fy = _mm256_fmadd_ps(dy, invd_3, fy); // 17
-            fz = _mm256_fmadd_ps(dz, invd_3, fz); // 19
+            fx = _mm256_fmadd_ps(dx, invd, fx); // 15
+            fy = _mm256_fmadd_ps(dy, invd, fy); // 17
+            fz = _mm256_fmadd_ps(dz, invd, fz); // 19
         }
 
-        p->vx[i] = _mm256_cvtss_f32(_mm256_fmadd_ps(vdt, fx, vxi)); // 2
-        p->vy[i] = _mm256_cvtss_f32(_mm256_fmadd_ps(vdt, fy, vyi)); // 4
-        p->vz[i] = _mm256_cvtss_f32(_mm256_fmadd_ps(vdt, fz, vzi)); // 6
+        f32 hfx = hsum(fx); // 4
+        f32 hfy = hsum(fy); // 8
+        f32 hfz = hsum(fz); // 12
+        p->vx[i] += dt * hfx; // 10
+        p->vy[i] += dt * hfy; // 12
+        p->vz[i] += dt * hfz; // 14
     }
 
     // 6 floating-point operations
@@ -113,9 +124,9 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
     	f256 vyi = _mm256_loadu_ps(p->vy + i);
     	f256 vzi = _mm256_loadu_ps(p->vz + i);
 
-        pxi = _mm256_fmadd_ps(vdt, vxi, pxi); // 8
-        pyi = _mm256_fmadd_ps(vdt, vyi, pyi); // 10
-        pzi = _mm256_fmadd_ps(vdt, vzi, pzi); // 12
+        pxi = _mm256_fmadd_ps(vdt, vxi, pxi); // 16
+        pyi = _mm256_fmadd_ps(vdt, vyi, pyi); // 18
+        pzi = _mm256_fmadd_ps(vdt, vzi, pzi); // 20
 
         _mm256_storeu_ps(p->px + i, pxi);
         _mm256_storeu_ps(p->py + i, pyi);
@@ -184,7 +195,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f64 h2 = (19.0f * h1 + 12.0f * (f64)(cfg.nb_bodies)) * 1e-9;
+        const f64 h2 = (19.0f * h1 + 20.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
         if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);
