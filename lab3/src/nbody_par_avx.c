@@ -21,12 +21,12 @@ particles_t *particles_new(const u64 nb_bodies)
     if (!p)
         goto particles_failed_alloc;
 
-    p->px = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
-    p->py = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
-    p->pz = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
-    p->vx = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
-    p->vy = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
-    p->vz = aligned_alloc(64, (nb_bodies + (nb_bodies % 64)) * sizeof(f32));
+    p->px = aligned_alloc(64, (nb_bodies + (nb_bodies % 128)) * sizeof(f32));
+    p->py = aligned_alloc(64, (nb_bodies + (nb_bodies % 128)) * sizeof(f32));
+    p->pz = aligned_alloc(64, (nb_bodies + (nb_bodies % 128)) * sizeof(f32));
+    p->vx = aligned_alloc(64, (nb_bodies + (nb_bodies % 128)) * sizeof(f32));
+    p->vy = aligned_alloc(64, (nb_bodies + (nb_bodies % 128)) * sizeof(f32));
+    p->vz = aligned_alloc(64, (nb_bodies + (nb_bodies % 128)) * sizeof(f32));
     if (!p->px || !p->py || !p->pz || !p->px || !p->py || !p->pz)
         goto particles_failed_alloc;
 
