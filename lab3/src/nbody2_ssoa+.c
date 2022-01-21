@@ -147,8 +147,8 @@ int main(int argc, char **argv)
 
     const u64 mem_size = cfg.nb_bodies * 6 * sizeof(real);
     fprintf(stderr,
-            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
-            mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf kB, %.2lf MB\n\n",
+            mem_size, (f64)mem_size / 1000.0f, (f64)mem_size / 1000000.0f);
     fprintf(stderr,
             "\033[1m%5s %10s %10s %8s\033[0m\n",
             "Iter", "Time (s)", "Interact/s", "GFLOP/s");
@@ -184,10 +184,11 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "-----------------------------------------------------\n");
     fprintf(stderr, "\033[1m%s %4s \033[42m%10.1lf +- %.1lf GFLOP/s\033[0m\n",
-           "Average performance:", "", rate, drate);
+            "Average performance:", "", rate, drate);
     fprintf(stderr, "-----------------------------------------------------\n");
 
-    particles_print(p, cfg);
+    if (strcmp(cfg.output, "none"))
+        particles_print(p, cfg);
 
     particles_drop(p);
     return 0;

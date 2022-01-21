@@ -64,7 +64,7 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
     const f512 softening = _mm512_set1_ps(1e-20);
     const f512 vdt = _mm512_set1_ps(dt);
 
-    // 6 floating-point operations
+    // 30 floating-point operations
     for (usize i = 0; i < nb_bodies; i++) {
         f512 fx = _mm512_setzero_ps();
         f512 fy = _mm512_setzero_ps();
@@ -105,12 +105,12 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
             fz = _mm512_fmadd_ps(dz, invd, fz); // 19
         }
 
-        f32 hfx = hsum(fx); // 4
-        f32 hfy = hsum(fy); // 8
-        f32 hfz = hsum(fz); // 12
-        p->vx[i] += dt * hfx; // 10
-        p->vy[i] += dt * hfy; // 12
-        p->vz[i] += dt * hfz; // 14
+        f32 hfx = hsum(fx); // 8
+        f32 hfy = hsum(fy); // 16
+        f32 hfz = hsum(fz); // 24
+        p->vx[i] += dt * hfx; // 26
+        p->vy[i] += dt * hfy; // 28
+        p->vz[i] += dt * hfz; // 30
     }
 
     // 6 floating-point operations
@@ -123,9 +123,9 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
     	f512 vyi = _mm512_loadu_ps(p->vy + i);
     	f512 vzi = _mm512_loadu_ps(p->vz + i);
 
-        pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 16
-        pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 18
-        pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 20
+        pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 32
+        pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 34
+        pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 36
 
         _mm512_storeu_ps(p->px + i, pxi);
         _mm512_storeu_ps(p->py + i, pyi);
@@ -178,8 +178,8 @@ int main(int argc, char **argv)
 
     const u64 mem_size = cfg.nb_bodies * 6 * sizeof(f32);
     fprintf(stderr,
-            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
-            mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf kB, %.2lf MB\n\n",
+            mem_size, (f64)mem_size / 1000.0f, (f64)mem_size / 1000000.0f);
     fprintf(stderr,
             "\033[1m%5s %10s %10s %8s\033[0m\n",
             "Iter", "Time (s)", "Interact/s", "GFLOP/s");
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f64 h2 = (19.0f * h1 + 20.0f * (f64)(cfg.nb_bodies)) * 1e-9;
+        const f64 h2 = (19.0f * h1 + 36.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
         if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);
@@ -215,10 +215,11 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "-----------------------------------------------------\n");
     fprintf(stderr, "\033[1m%s %4s \033[42m%10.1lf +- %.1lf GFLOP/s\033[0m\n",
-           "Average performance:", "", rate, drate);
+            "Average performance:", "", rate, drate);
     fprintf(stderr, "-----------------------------------------------------\n");
 
-    particles_print(p, cfg);
+    if (strcmp(cfg.output, "none"))
+        particles_print(p, cfg);
 
     particles_drop(p);
     return 0;
