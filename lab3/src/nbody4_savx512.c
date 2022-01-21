@@ -8,6 +8,12 @@
 #include "types.h"
 #include "utils.h"
 
+static inline
+f32 hsum(const f512 x)
+{
+    return _mm512_reduce_add_ps(x);
+}
+
 typedef struct particles_s {
     f32 *px, *py, *pz;
     f32 *vx, *vy, *vz;
@@ -68,9 +74,6 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
         f512 pxi = _mm512_set1_ps(p->px[i]);
         f512 pyi = _mm512_set1_ps(p->py[i]);
         f512 pzi = _mm512_set1_ps(p->pz[i]);
-        f512 vxi = _mm512_set1_ps(p->vx[i]);
-        f512 vyi = _mm512_set1_ps(p->vy[i]);
-        f512 vzi = _mm512_set1_ps(p->vz[i]);
 
         // 19 floating-point operations
         for (usize j = 0; j < nb_bodies; j += 16) {
@@ -91,20 +94,23 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
                     softening); // 9
 
         #ifdef __AVX512ER__
-            const f512 invd = _mm512_rsqrt28_ps(d_2); // 11
+            f512 invd = _mm512_rsqrt28_ps(d_2); // 11
         #else
-            const f512 invd = _mm512_rsqrt14_ps(d_2); // 11
+            f512 invd = _mm512_rsqrt14_ps(d_2); // 11
         #endif
-            const f512 invd_3 = _mm512_mul_ps(_mm512_mul_ps(invd, invd), invd); // 13
+            invd = _mm512_mul_ps(_mm512_mul_ps(invd, invd), invd); // 13
 
-            fx = _mm512_fmadd_ps(dx, invd_3, fx); // 15
-            fy = _mm512_fmadd_ps(dy, invd_3, fy); // 17
-            fz = _mm512_fmadd_ps(dz, invd_3, fz); // 19
+            fx = _mm512_fmadd_ps(dx, invd, fx); // 15
+            fy = _mm512_fmadd_ps(dy, invd, fy); // 17
+            fz = _mm512_fmadd_ps(dz, invd, fz); // 19
         }
 
-        p->vx[i] = _mm512_cvtss_f32(_mm512_fmadd_ps(vdt, fx, vxi)); // 2
-        p->vy[i] = _mm512_cvtss_f32(_mm512_fmadd_ps(vdt, fy, vyi)); // 4
-        p->vz[i] = _mm512_cvtss_f32(_mm512_fmadd_ps(vdt, fz, vzi)); // 6
+        f32 hfx = hsum(fx); // 4
+        f32 hfy = hsum(fy); // 8
+        f32 hfz = hsum(fz); // 12
+        p->vx[i] += dt * hfx; // 10
+        p->vy[i] += dt * hfy; // 12
+        p->vz[i] += dt * hfz; // 14
     }
 
     // 6 floating-point operations
@@ -117,9 +123,9 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
     	f512 vyi = _mm512_loadu_ps(p->vy + i);
     	f512 vzi = _mm512_loadu_ps(p->vz + i);
 
-        pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 8
-        pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 10
-        pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 12
+        pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 16
+        pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 18
+        pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 20
 
         _mm512_storeu_ps(p->px + i, pxi);
         _mm512_storeu_ps(p->py + i, pyi);
@@ -188,7 +194,7 @@ int main(int argc, char **argv)
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f64 h2 = (19.0f * h1 + 12.0f * (f64)(cfg.nb_bodies)) * 1e-9;
+        const f64 h2 = (19.0f * h1 + 20.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
         if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);

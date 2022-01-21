@@ -31,37 +31,42 @@ ICX_OFLAGS=-Wall -g3 -xHost -mavx -Ofast -funroll-loops -finline-functions -flto
 GCC_CLANG_LDFLAGS=-lm -fopenmp
 ICC_ICX_LDFLAGS=-qmkl -qopenmp
 
+TGCC=target/gcc
+TCLG=target/clang
+TICC=target/icc
+TICX=target/icx
+
 
 ## MAKEFILE RULES
 all: base seq par
 
-seq: base soa seq_soap seq_avx seq_avx512
+seq: base soa ssoa+ savx savx512
 
-par: par_soap par_avx par_avx512
+par: psoa+ pavx pavx512
 
-gcc: target/gcc/nbody0 target/gcc/nbody_soa target/gcc/nbody_seq_soap target/gcc/nbody_par_soap target/gcc/nbody_seq_avx target/gcc/nbody_par_avx target/gcc/nbody_seq_avx512 target/gcc/nbody_par_avx512
+clang: $(TCLG)/nbody0 $(TCLG)/nbody1_soa $(TCLG)/nbody2_ssoa+ $(TCLG)/nbody3_savx $(TCLG)/nbody4_savx512 $(TCLG)/nbody5_psoa+ $(TCLG)/nbody6_pavx $(TCLG)/nbody7_pavx512
 
-clang: target/clang/nbody0  target/clang/nbody_soa target/clang/nbody_seq_soap target/clang/nbody_par_soap target/clang/nbody_seq_avx target/clang/nbody_par_avx target/clang/nbody_seq_avx512 target/clang/nbody_par_avx512
+gcc: $(TGCC)/nbody0 $(TGCC)/nbody1_soa $(TGCC)/nbody2_ssoa+ $(TGCC)/nbody3_savx $(TGCC)/nbody4_savx512 $(TGCC)/nbody5_psoa+ $(TGCC)/nbody6_pavx $(TGCC)/nbody7_pavx512
 
-icc: target/icc/nbody0  target/icc/nbody_soa target/icc/nbody_seq_soap target/icc/nbody_par_soap target/icc/nbody_seq_avx target/icc/nbody_par_avx target/icc/nbody_seq_avx512 target/icc/nbody_par_avx512
+icc: $(TICC)/nbody0 $(TICC)/nbody1_soa $(TICC)/nbody2_ssoa+ $(TICC)/nbody3_savx $(TICC)/nbody4_savx512 $(TICC)/nbody5_psoa+ $(TICC)/nbody6_pavx $(TICC)/nbody7_pavx512
 
-icx: target/icx/nbody0  target/icx/nbody_soa target/icx/nbody_seq_soap target/icx/nbody_par_soap target/icx/nbody_seq_avx target/icx/nbody_par_avx target/icx/nbody_seq_avx512 target/icx/nbody_par_avx512
+icx: $(TICX)/nbody0 $(TICX)/nbody1_soa $(TICX)/nbody2_ssoa+ $(TICX)/nbody3_savx $(TICX)/nbody4_savx512 $(TICX)/nbody5_psoa+ $(TICX)/nbody6_pavx $(TICX)/nbody7_pavx512
 
-base: target/gcc/nbody0 target/clang/nbody0 target/icc/nbody0 target/icx/nbody0
+base: $(TCLG)/nbody0 $(TGCC)/nbody0 $(TICC)/nbody0 $(TICX)/nbody0
 
-soa: target/gcc/nbody_soa target/clang/nbody_soa target/icc/nbody_soa target/icx/nbody_soa
+soa: $(TCLG)/nbody1_soa $(TGCC)/nbody1_soa $(TICC)/nbody1_soa $(TICX)/nbody1_soa
 
-seq_soap: target/gcc/nbody_seq_soap target/clang/nbody_seq_soap target/icc/nbody_seq_soap target/icx/nbody_seq_soap
+ssoa+: $(TCLG)/nbody2_ssoa+ $(TGCC)/nbody2_ssoa+ $(TICC)/nbody2_ssoa+ $(TICX)/nbody2_ssoa+
 
-par_soap: target/gcc/nbody_par_soap target/clang/nbody_par_soap target/icc/nbody_par_soap target/icx/nbody_par_soap
+savx: $(TCLG)/nbody3_savx $(TGCC)/nbody3_savx $(TICC)/nbody3_savx $(TICX)/nbody3_savx
 
-seq_avx: target/gcc/nbody_seq_avx target/clang/nbody_seq_avx target/icc/nbody_seq_avx target/icx/nbody_seq_avx
+savx512: $(TCLG)/nbody4_savx512 $(TGCC)/nbody4_savx512 $(TICC)/nbody4_savx512 $(TICX)/nbody4_savx512
 
-par_avx: target/gcc/nbody_par_avx target/clang/nbody_par_avx target/icc/nbody_par_avx target/icx/nbody_par_avx
+psoa+: $(TCLG)/nbody5_psoa+ $(TGCC)/nbody5_psoa+ $(TICC)/nbody5_psoa+ $(TICX)/nbody5_psoa+
 
-seq_avx512: target/gcc/nbody_seq_avx512 target/clang/nbody_seq_avx512 target/icc/nbody_seq_avx512 target/icx/nbody_seq_avx512
+pavx: $(TCLG)/nbody6_pavx $(TGCC)/nbody6_pavx $(TICC)/nbody6_pavx $(TICX)/nbody6_pavx
 
-par_avx512: target/gcc/nbody_par_avx512 target/clang/nbody_par_avx512 target/icc/nbody_par_avx512 target/icx/nbody_par_avx512
+pavx512: $(TCLG)/nbody7_pavx512 $(TGCC)/nbody7_pavx512 $(TICC)/nbody7_pavx512 $(TICX)/nbody7_pavx512
 
 
 ## COMPILATION TARGETS
@@ -70,20 +75,20 @@ ref: src/nbody0.c src/utils.c
 	$(CLANG) $(PRECISION) -g3 -ffp-model=precise -march=native -mtune=native -O2 -mno-avx $^ -o target/$@ $(GCC_CLANG_LDFLAGS)
 	target/ref $(PARAMS) -d -o data/ref.dat
 
-target/gcc/nbody%: src/nbody%.c src/utils.c
-	@mkdir -p target/gcc/
-	$(GCC) $(PRECISION) $(GCC_OFLAGS) $^ -o $@ $(GCC_CLANG_LDFLAGS)
-
-target/clang/nbody%: src/nbody%.c src/utils.c
-	@mkdir -p target/clang/
+$(TCLG)/nbody%: src/nbody%.c src/utils.c
+	@mkdir -p $(TCLG)
 	$(CLANG) $(PRECISION) $(CLANG_OFLAGS) $^ -o $@ $(GCC_CLANG_LDFLAGS)
 
-target/icc/nbody%: src/nbody%.c src/utils.c
-	@mkdir -p target/icc/
+$(TGCC)/nbody%: src/nbody%.c src/utils.c
+	@mkdir -p $(TGCC)
+	$(GCC) $(PRECISION) $(GCC_OFLAGS) $^ -o $@ $(GCC_CLANG_LDFLAGS)
+
+$(TICC)/nbody%: src/nbody%.c src/utils.c
+	@mkdir -p $(TICC)
 	$(ICC) $(PRECISION) $(ICC_OFLAGS) $^ -o $@ $(ICC_ICX_LDFLAGS)
 	
-target/icx/nbody%: src/nbody%.c src/utils.c
-	@mkdir -p target/icx/
+$(TICX)/nbody%: src/nbody%.c src/utils.c
+	@mkdir -p $(TICX)
 	$(ICX) $(PRECISION) $(ICX_OFLAGS) $^ -o $@ $(ICC_ICX_LDFLAGS)
 
 
