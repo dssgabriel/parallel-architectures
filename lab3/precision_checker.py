@@ -108,7 +108,7 @@ def main():
     ref = Path("data/ref.dat")
     out = Path(sys.argv[1])
     check_files(ref, out)
-    ref_file = open(ref, "r") 
+    ref_file = open(ref, "r")
     out_file = open(out, "r")
 
     ref_cfg, ref_contents, out_cfg, out_contents = read_files(ref_file, out_file)
