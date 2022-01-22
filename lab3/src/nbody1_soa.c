@@ -92,7 +92,7 @@ void particles_update(particles_t *p, const u64 nb_bodies, const real dt)
 
 void particles_print(particles_t *p, const config_t cfg)
 {
-    if (!strcmp(cfg.output, "none"))
+    if (!strcmp(cfg.output, "none") || cfg.bench == true)
         return;
 
     FILE *fp;
@@ -122,20 +122,9 @@ void particles_print(particles_t *p, const config_t cfg)
         fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
 }
 
-void particles_drop(particles_t *p)
-{
-    free(p->px);
-    free(p->py);
-    free(p->pz);
-    free(p->vx);
-    free(p->vy);
-    free(p->vz);
-    free(p);
-}
-
 void particles_bench(const config_t cfg, f64 *times, f64 rate, f64 drate)
 {
-    if (!strcmp(cfg.output, "none"))
+    if (!strcmp(cfg.output, "none") || cfg.check == true)
         return;
 
     FILE *fp;
@@ -159,6 +148,17 @@ void particles_bench(const config_t cfg, f64 *times, f64 rate, f64 drate)
 
     if (strcmp(cfg.output, "stdout") && fp == stdout)
         fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
+}
+
+void particles_drop(particles_t *p)
+{
+    free(p->px);
+    free(p->py);
+    free(p->pz);
+    free(p->vx);
+    free(p->vy);
+    free(p->vz);
+    free(p);
 }
 
 int main(int argc, char **argv)

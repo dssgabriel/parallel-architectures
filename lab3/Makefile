@@ -92,4 +92,4 @@ $(TICX)/nbody%: src/nbody%.c src/utils.c
 
 ## UTILS
 clean:
-	@rm -Rf target/ opt_reports/ maqao/**/* data/**/* data/ref.dat bench/precision/**/* bench/perf/**/* 
+	@rm -Rf target/ opt_reports/ maqao/**/* data/**/* data/ref.dat output/**/*  bench/precision/**/* bench/perf/**/* 

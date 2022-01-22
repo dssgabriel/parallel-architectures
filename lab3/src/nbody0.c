@@ -76,7 +76,7 @@ void particles_update(particle_t *p, const u64 nb_bodies, const real dt)
 
 void particles_print(particle_t *p, const config_t cfg)
 {
-    if (!strcmp(cfg.output, "none"))
+    if (!strcmp(cfg.output, "none") || cfg.bench == true)
         return;
 
     FILE *fp;
@@ -108,7 +108,7 @@ void particles_print(particle_t *p, const config_t cfg)
 
 void particles_bench(const config_t cfg, f64 *times, f64 rate, f64 drate)
 {
-    if (!strcmp(cfg.output, "none"))
+    if (!strcmp(cfg.output, "none") || cfg.check == true)
         return;
 
     FILE *fp;
