@@ -69,20 +69,19 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
     const f256 softening = _mm256_set1_ps(1e-20);
     const f256 vdt = _mm256_set1_ps(dt);
 
-    // 6 floating-point operations
+    // 14 floating-point operations
     for (usize i = 0; i < nb_bodies; i++) {
         f256 fx = _mm256_setzero_ps();
         f256 fy = _mm256_setzero_ps();
         f256 fz = _mm256_setzero_ps();
 
-        // Load all i-bound values
+        // Load i-bound values
         f256 pxi = _mm256_set1_ps(p->px[i]);
         f256 pyi = _mm256_set1_ps(p->py[i]);
         f256 pzi = _mm256_set1_ps(p->pz[i]);
 
         // 19 floating-point operations
         for (usize j = 0; j < nb_bodies; j += 8) {
-            // From here: p_i = d_, p_j = d_^2
             const f256 dx = _mm256_sub_ps(_mm256_loadu_ps(p->px + j), pxi); // 1
             const f256 dy = _mm256_sub_ps(_mm256_loadu_ps(p->py + j), pyi); // 2
             const f256 dz = _mm256_sub_ps(_mm256_loadu_ps(p->pz + j), pzi); // 3
@@ -116,7 +115,6 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
 
     // 6 floating-point operations
     for (usize i = 0; i < nb_bodies; i += 8) {
-        // Reload v_i values
     	f256 pxi = _mm256_loadu_ps(p->px + i);
     	f256 pyi = _mm256_loadu_ps(p->py + i);
     	f256 pzi = _mm256_loadu_ps(p->pz + i);
@@ -136,22 +134,57 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
 
 void particles_print(particles_t *p, const config_t cfg)
 {
+    if (!strcmp(cfg.output, "none"))
+        return;
+
     FILE *fp;
     if (strcmp(cfg.output, "stdout")) {
         fp = fopen(cfg.output, "wb");
-        if (!fp) {
-            printf("warning: failed to open file %s\n", cfg.output);
+        if (!fp)
             fp = stdout;
-        }
     } else {
         fp = stdout;
     }
+
+    char *precision = sizeof(real) == 4 ? "fp32" : "fp64";
+    fprintf(fp, "%llu\t%u\t%lf\t%s\n\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
 
     for (usize i = 0; i < cfg.nb_bodies; i++)
         fprintf(fp, "%.8e\t%.8e\t%.8e\n", p->px[i], p->py[i], p->pz[i]);
 
     if (strcmp(cfg.output, "stdout") && fp != stdout)
         fclose(fp);
+
+    if (strcmp(cfg.output, "stdout") && fp == stdout)
+        fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
+}
+
+void particles_bench(const config_t cfg, f64 *times, f64 rate, f64 drate)
+{
+    if (!strcmp(cfg.output, "none"))
+        return;
+
+    FILE *fp;
+    if (strcmp(cfg.output, "stdout")) {
+        fp = fopen(cfg.output, "wb");
+        if (!fp)
+            fp = stdout;
+    } else {
+        fp = stdout;
+    }
+
+    char *precision = sizeof(real) == 4 ? "fp32" : "fp64";
+    fprintf(fp, "%llu\t%u\t%lf\t%s\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
+    fprintf(fp, "%lf\t%lf\n", rate, drate);
+
+    for (usize i = 0; i < cfg.nb_iter; i++)
+        fprintf(fp, "%zu\t%lf\n", i, times[i]);
+        
+    if (strcmp(cfg.output, "stdout") && fp != stdout)
+        fclose(fp);
+
+    if (strcmp(cfg.output, "stdout") && fp == stdout)
+        fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
 }
 
 void particles_drop(particles_t *p)
@@ -170,17 +203,18 @@ int main(int argc, char **argv)
     config_t cfg = (argc > 1) ? config_from(argc, argv) : config_new();
     if (cfg.debug)
         config_print(cfg);
+    f64 *times = cfg.bench == true ? malloc(cfg.nb_iter * sizeof(f64)): NULL;
 
-    f64 rate = 0.0, drate = 0.0;
+    f64 rate = 0.0f, drate = 0.0f;
     particles_t *p = particles_new(cfg.nb_bodies);
     if (!p)
-        return printf("error: failed to allocate particles\n"), 1;
+        return fprintf(stderr, "\033[1;31merror:\033[0m failed to allocate particles\n"), 1;
     particles_init(p, cfg.nb_bodies);
 
     const u64 mem_size = cfg.nb_bodies * 6 * sizeof(f32);
     fprintf(stderr,
-            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf kB, %.2lf MB\n\n",
-            mem_size, (f64)mem_size / 1000.0f, (f64)mem_size / 1000000.0f);
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
+            mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
     fprintf(stderr,
             "\033[1m%5s %10s %10s %8s\033[0m\n",
             "Iter", "Time (s)", "Interact/s", "GFLOP/s");
@@ -192,6 +226,9 @@ int main(int argc, char **argv)
         particles_update(p, cfg.nb_bodies, cfg.dt);
         const f64 end = omp_get_wtime();
 
+        // Register time
+        if (times)
+            times[i] = end - start;
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
@@ -219,8 +256,8 @@ int main(int argc, char **argv)
             "Average performance:", "", rate, drate);
     fprintf(stderr, "-----------------------------------------------------\n");
 
-    if (strcmp(cfg.output, "none"))
-        particles_print(p, cfg);
+    particles_print(p, cfg);
+    particles_bench(cfg, times, rate, drate);
 
     particles_drop(p);
     return 0;

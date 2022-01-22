@@ -76,16 +76,20 @@ void particles_update(particle_t *p, const u64 nb_bodies, const real dt)
 
 void particles_print(particle_t *p, const config_t cfg)
 {
+    if (!strcmp(cfg.output, "none"))
+        return;
+
     FILE *fp;
     if (strcmp(cfg.output, "stdout")) {
         fp = fopen(cfg.output, "wb");
-        if (!fp) {
-            printf("warning: failed to open file %s\n", cfg.output);
+        if (!fp)
             fp = stdout;
-        }
     } else {
         fp = stdout;
     }
+
+    char *precision = sizeof(real) == 4 ? "fp32" : "fp64";
+    fprintf(fp, "%llu\t%u\t%lf\t%s\n\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
 
     if (sizeof(real) == 4) {
         for (usize i = 0; i < cfg.nb_bodies; i++)
@@ -97,6 +101,37 @@ void particles_print(particle_t *p, const config_t cfg)
 
     if (strcmp(cfg.output, "stdout") && fp != stdout)
         fclose(fp);
+
+    if (strcmp(cfg.output, "stdout") && fp == stdout)
+        fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
+}
+
+void particles_bench(const config_t cfg, f64 *times, f64 rate, f64 drate)
+{
+    if (!strcmp(cfg.output, "none"))
+        return;
+
+    FILE *fp;
+    if (strcmp(cfg.output, "stdout")) {
+        fp = fopen(cfg.output, "wb");
+        if (!fp)
+            fp = stdout;
+    } else {
+        fp = stdout;
+    }
+
+    char *precision = sizeof(real) == 4 ? "fp32" : "fp64";
+    fprintf(fp, "%llu\t%u\t%lf\t%s\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
+    fprintf(fp, "%lf\t%lf\n", rate, drate);
+
+    for (usize i = 0; i < cfg.nb_iter; i++)
+        fprintf(fp, "%zu\t%lf\n", i, times[i]);
+        
+    if (strcmp(cfg.output, "stdout") && fp != stdout)
+        fclose(fp);
+
+    if (strcmp(cfg.output, "stdout") && fp == stdout)
+        fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
 }
 
 int main(int argc, char **argv)
@@ -104,17 +139,18 @@ int main(int argc, char **argv)
     config_t cfg = (argc > 1) ? config_from(argc, argv) : config_new();
     if (cfg.debug)
         config_print(cfg);
+    f64 *times = cfg.bench == true ? malloc(cfg.nb_iter * sizeof(f64)) : NULL;
 
     f64 rate = 0.0f, drate = 0.0f;
     particle_t *p = particles_new(cfg.nb_bodies);
     if (!p)
-        return printf("error: failed to allocate particles\n"), 1;
+        return fprintf(stderr, "\033[1;32merror:\033[0m failed to allocate particles\n"), 1;
     particles_init(p, cfg.nb_bodies);
 
     const u64 mem_size = cfg.nb_bodies * sizeof(particle_t);
     fprintf(stderr,
-            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf kB, %.2lf MB\n\n",
-            mem_size, (f64)mem_size / 1000.0f, (f64)mem_size / 1000000.0f);
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
+            mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
     fprintf(stderr,
             "\033[1m%5s %10s %10s %8s\033[0m\n",
             "Iter", "Time (s)", "Interact/s", "GFLOP/s");
@@ -126,6 +162,9 @@ int main(int argc, char **argv)
         particles_update(p, cfg.nb_bodies, cfg.dt);
         const f64 end = omp_get_wtime();
 
+        // Register time
+        if (times)
+            times[i] = end - start;
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
@@ -153,8 +192,8 @@ int main(int argc, char **argv)
             "Average performance:", "", rate, drate);
     fprintf(stderr, "-----------------------------------------------------\n");
 
-    if (strcmp(cfg.output, "none"))
-        particles_print(p, cfg);
+    particles_print(p, cfg);
+    particles_bench(cfg, times, rate, drate);
 
     free(p);
     return 0;

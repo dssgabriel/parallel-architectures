@@ -8,6 +8,8 @@
 #include "types.h"
 #include "utils.h"
 
+static const usize BLK_SIZE = 4096;
+
 static inline
 f32 hsum(const f512 x)
 {
@@ -64,70 +66,79 @@ void particles_update(particles_t *p, const u64 nb_bodies, const f32 dt)
     const f512 softening = _mm512_set1_ps(1e-20);
     const f512 vdt = _mm512_set1_ps(dt);
 
-    // 30 floating-point operations
-    for (usize i = 0; i < nb_bodies; i++) {
-        f512 fx = _mm512_setzero_ps();
-        f512 fy = _mm512_setzero_ps();
-        f512 fz = _mm512_setzero_ps();
+    #pragma omp parallel
+    for (usize blk_start = 0; blk_start < nb_bodies; blk_start += BLK_SIZE) {
+        const usize blk_end = blk_start + BLK_SIZE;
 
-        // Load i-bound values
-        f512 pxi = _mm512_set1_ps(p->px[i]);
-        f512 pyi = _mm512_set1_ps(p->py[i]);
-        f512 pzi = _mm512_set1_ps(p->pz[i]);
+        // 30 floating-point operations
+        #pragma omp for schedule(guided)
+        for (usize i = 0; i < nb_bodies; i++) {
+            f512 fx = _mm512_setzero_ps();
+            f512 fy = _mm512_setzero_ps();
+            f512 fz = _mm512_setzero_ps();
 
-        // 19 floating-point operations
-        for (usize j = 0; j < nb_bodies; j += 16) {
-            const f512 dx = _mm512_sub_ps(_mm512_loadu_ps(p->px + j), pxi); // 1
-            const f512 dy = _mm512_sub_ps(_mm512_loadu_ps(p->py + j), pyi); // 2
-            const f512 dz = _mm512_sub_ps(_mm512_loadu_ps(p->pz + j), pzi); // 3
+            // Load i-bound values
+            f512 pxi = _mm512_set1_ps(p->px[i]);
+            f512 pyi = _mm512_set1_ps(p->py[i]);
+            f512 pzi = _mm512_set1_ps(p->pz[i]);
 
-            const f512 d_2 =
-                _mm512_add_ps(
+            // 19 floating-point operations
+            #pragma omp simd reduction(+:fx,fy,fz) 
+            for (usize j = blk_start; j < blk_end; j += 16) {
+                const f512 dx = _mm512_sub_ps(_mm512_loadu_ps(p->px + j), pxi); // 1
+                const f512 dy = _mm512_sub_ps(_mm512_loadu_ps(p->py + j), pyi); // 2
+                const f512 dz = _mm512_sub_ps(_mm512_loadu_ps(p->pz + j), pzi); // 3
+
+                const f512 d_2 =
                     _mm512_add_ps(
                         _mm512_add_ps(
-                            _mm512_mul_ps(dx, dx),
-                            _mm512_mul_ps(dy, dy)
+                            _mm512_add_ps(
+                                _mm512_mul_ps(dx, dx),
+                                _mm512_mul_ps(dy, dy)
+                            ),
+                            _mm512_mul_ps(dz, dz)
                         ),
-                        _mm512_mul_ps(dz, dz)
-                    ),
-                    softening); // 9
+                        softening); // 9
 
-        #ifdef __AVX512ER__
-            f512 invd = _mm512_rsqrt28_ps(d_2); // 11
-        #else
-            f512 invd = _mm512_rsqrt14_ps(d_2); // 11
-        #endif
-            invd = _mm512_mul_ps(_mm512_mul_ps(invd, invd), invd); // 13
+            #ifdef __AVX512ER__
+                const f512 invd = _mm512_rsqrt28_ps(d_2); // 11
+            #else
+                const f512 invd = _mm512_rsqrt14_ps(d_2); // 11
+            #endif
+                const f512 invd_3 = _mm512_mul_ps(_mm512_mul_ps(invd, invd), invd); // 13
 
-            fx = _mm512_fmadd_ps(dx, invd, fx); // 15
-            fy = _mm512_fmadd_ps(dy, invd, fy); // 17
-            fz = _mm512_fmadd_ps(dz, invd, fz); // 19
+                fx = _mm512_fmadd_ps(dx, invd_3, fx); // 15
+                fy = _mm512_fmadd_ps(dy, invd_3, fy); // 17
+                fz = _mm512_fmadd_ps(dz, invd_3, fz); // 19
+            }
+
+            f32 hfx = hsum(fx); // 8
+            f32 hfy = hsum(fy); // 16
+            f32 hfz = hsum(fz); // 24
+            p->vx[i] += dt * hfx; // 26
+            p->vy[i] += dt * hfy; // 28
+            p->vz[i] += dt * hfz; // 30
         }
 
-        f32 hfx = hsum(fx); // 8
-        f32 hfy = hsum(fy); // 16
-        f32 hfz = hsum(fz); // 24
-        p->vx[i] += dt * hfx; // 26
-        p->vy[i] += dt * hfy; // 28
-        p->vz[i] += dt * hfz; // 30
-    }
+        // 6 floating-point operations
+        #pragma omp for schedule(guided)
+        for (usize i = 0; i < nb_bodies; i += 16) {
+            // Reload v_i values
+        	f512 pxi = _mm512_loadu_ps(p->px + i);
+        	f512 pyi = _mm512_loadu_ps(p->py + i);
+        	f512 pzi = _mm512_loadu_ps(p->pz + i);
+        	f512 vxi = _mm512_loadu_ps(p->vx + i);
+        	f512 vyi = _mm512_loadu_ps(p->vy + i);
+        	f512 vzi = _mm512_loadu_ps(p->vz + i);
 
-    // 6 floating-point operations
-    for (usize i = 0; i < nb_bodies; i += 16) {
-    	f512 pxi = _mm512_loadu_ps(p->px + i);
-    	f512 pyi = _mm512_loadu_ps(p->py + i);
-    	f512 pzi = _mm512_loadu_ps(p->pz + i);
-    	f512 vxi = _mm512_loadu_ps(p->vx + i);
-    	f512 vyi = _mm512_loadu_ps(p->vy + i);
-    	f512 vzi = _mm512_loadu_ps(p->vz + i);
+            pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 8
+            pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 10
+            pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 12
 
-        pxi = _mm512_fmadd_ps(vdt, vxi, pxi); // 32
-        pyi = _mm512_fmadd_ps(vdt, vyi, pyi); // 34
-        pzi = _mm512_fmadd_ps(vdt, vzi, pzi); // 36
-
-        _mm512_storeu_ps(p->px + i, pxi);
-        _mm512_storeu_ps(p->py + i, pyi);
-        _mm512_storeu_ps(p->pz + i, pzi);
+            _mm512_storeu_ps(p->px + i, pxi);
+            _mm512_storeu_ps(p->py + i, pyi);
+            _mm512_storeu_ps(p->pz + i, pzi);
+        }
     }
 }
 
@@ -158,34 +169,6 @@ void particles_print(particles_t *p, const config_t cfg)
         fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
 }
 
-void particles_bench(const config_t cfg, f64 *times, f64 rate, f64 drate)
-{
-    if (!strcmp(cfg.output, "none"))
-        return;
-
-    FILE *fp;
-    if (strcmp(cfg.output, "stdout")) {
-        fp = fopen(cfg.output, "wb");
-        if (!fp)
-            fp = stdout;
-    } else {
-        fp = stdout;
-    }
-
-    char *precision = sizeof(real) == 4 ? "fp32" : "fp64";
-    fprintf(fp, "%llu\t%u\t%lf\t%s\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
-    fprintf(fp, "%lf\t%lf\n", rate, drate);
-
-    for (usize i = 0; i < cfg.nb_iter; i++)
-        fprintf(fp, "%zu\t%lf\n", i, times[i]);
-        
-    if (strcmp(cfg.output, "stdout") && fp != stdout)
-        fclose(fp);
-
-    if (strcmp(cfg.output, "stdout") && fp == stdout)
-        fprintf(stderr, "\033[1;33mwarning:\033[0m failed to open file %s\n", cfg.output);
-}
-
 void particles_drop(particles_t *p)
 {
     free(p->px);
@@ -202,7 +185,6 @@ int main(int argc, char **argv)
     config_t cfg = (argc > 1) ? config_from(argc, argv) : config_new();
     if (cfg.debug)
         config_print(cfg);
-    f64 *times = cfg.bench == true ? malloc(cfg.nb_iter * sizeof(f64)): NULL;
 
     f64 rate = 0.0f, drate = 0.0f;
     particles_t *p = particles_new(cfg.nb_bodies);
@@ -212,8 +194,8 @@ int main(int argc, char **argv)
 
     const u64 mem_size = cfg.nb_bodies * 6 * sizeof(f32);
     fprintf(stderr,
-            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf KiB, %.2lf MiB\n\n",
-            mem_size, (f64)mem_size / 1024.0f, (f64)mem_size / 1048576.0f);
+            "\n\033[1mTotal memory size:\033[0m %llu B, %.2lf kB, %.2lf MB\n\n",
+            mem_size, (f64)mem_size / 1000.0f, (f64)mem_size / 1000000.0f);
     fprintf(stderr,
             "\033[1m%5s %10s %10s %8s\033[0m\n",
             "Iter", "Time (s)", "Interact/s", "GFLOP/s");
@@ -225,13 +207,10 @@ int main(int argc, char **argv)
         particles_update(p, cfg.nb_bodies, cfg.dt);
         const f64 end = omp_get_wtime();
 
-        // Register time
-        if (times)
-            times[i] = end - start;
         // Number of interactions/iterations
         const f64 h1 = (f64)(cfg.nb_bodies) * (f64)(cfg.nb_bodies - 1);
         // GFLOPS
-        const f64 h2 = (19.0f * h1 + 36.0f * (f64)(cfg.nb_bodies)) * 1e-9;
+        const f64 h2 = (19.0f * h1 + 12.0f * (f64)(cfg.nb_bodies)) * 1e-9;
 
         if (i >= cfg.nb_warmups) {
             rate += h2 / (end - start);
@@ -256,7 +235,6 @@ int main(int argc, char **argv)
     fprintf(stderr, "-----------------------------------------------------\n");
 
     particles_print(p, cfg);
-    particles_bench(cfg, times, rate, drate);
 
     particles_drop(p);
     return 0;

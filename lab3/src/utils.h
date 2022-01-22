@@ -23,6 +23,8 @@ typedef struct {
     real dt;
     char *output;
     bool debug;
+    bool bench;
+    bool check;
 } config_t;
 
 config_t config_new();
