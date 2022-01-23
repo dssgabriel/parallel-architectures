@@ -75,7 +75,7 @@ pbavx512: $(TGCC)/nbodyA_pbavx512 $(TICC)/nbodyA_pbavx512 $(TICX)/nbodyA_pbavx51
 ref: src/nbody0.c src/utils.c
 	@mkdir -p target/
 	$(GCC) $(PRECISION) -g3 -march=native -mtune=native -O1 -mno-avx $^ -o target/$@ $(GCC_LDFLAGS)
-	target/ref -d -i 1 -w 0 -o data/ref.dat
+	target/ref -d -c -o data/ref.dat
 
 $(TGCC)/nbody%: src/nbody%.c src/utils.c
 	@mkdir -p $(TGCC)
