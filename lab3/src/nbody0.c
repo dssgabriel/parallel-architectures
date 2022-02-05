@@ -89,7 +89,7 @@ void particles_print(particle_t *p, const config_t cfg)
     }
 
     char *precision = sizeof(real) == 4 ? "fp32" : "fp64";
-    fprintf(fp, "%llu\t%u\t%lf\t%s\n\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
+    fprintf(fp, "%llu\t%u\t%lf\t%s\n", cfg.nb_bodies, cfg.nb_iter, cfg.dt, precision);
 
     if (sizeof(real) == 4) {
         for (usize i = 0; i < cfg.nb_bodies; i++)

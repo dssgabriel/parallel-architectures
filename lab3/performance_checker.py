@@ -89,15 +89,15 @@ def main():
     iccbar = [x + bwidth for x in gccbar]
     icxbar = [x + bwidth for x in iccbar]
 
-    plt.bar(gccbar, [i[0] for i in gcc], color="indianred", width=bwidth, edgecolor="black", label="GCC", yerr=[i[1] for i in gcc])
+    plt.bar(gccbar, [i[0] for i in gcc], color="indianred", width=bwidth, edgecolor="black", label="GCC 9.3.0", yerr=[i[1] for i in gcc])
     for i in range(len(gccbar)):
         plt.text(gccbar[i] - 0.12, gcc[i][0] + 0.33, f"{round(gfs[i][0], 1)} GFLOP/s", fontsize=8)
 
-    plt.bar(iccbar, [i[0] for i in icc], color="mediumseagreen" , width=bwidth, edgecolor="black", label="ICC", yerr=[i[1] for i in icc])
+    plt.bar(iccbar, [i[0] for i in icc], color="mediumseagreen" , width=bwidth, edgecolor="black", label="ICC 2021.4.0", yerr=[i[1] for i in icc])
     for i in range(len(iccbar)):
         plt.text(iccbar[i] - 0.12, icc[i][0] + 0.33, f"{round(ifs[i][0], 1)} GFLOP/s", fontsize=8)
 
-    plt.bar(icxbar, [i[0] for i in icx], color="steelblue" , width=bwidth, edgecolor="black", label="ICX", yerr=[i[1] for i in icx])
+    plt.bar(icxbar, [i[0] for i in icx], color="steelblue" , width=bwidth, edgecolor="black", label="ICX 2021.4.0", yerr=[i[1] for i in icx])
     for i in range(len(icxbar)):
         plt.text(icxbar[i] - 0.12, icx[i][0] + 0.33, f"{round(xfs[i][0], 1)} GFLOP/s", fontsize=8)
 
@@ -105,6 +105,7 @@ def main():
     plt.xlabel('Number of particles', fontweight ='bold', fontsize = 15)
     plt.ylabel('Latency in seconds', fontweight ='bold', fontsize = 15)
     plt.xticks([r + bwidth for r in range(len(gcc))], [c[0] for c in configs])
+    plt.title("3D N-body simulation")
     plt.legend()
     plt.savefig(sys.argv[-1])
     plt.show()

@@ -84,7 +84,7 @@ config_t config_from(int argc, char **argv)
         }
     }
 
-    if ((!strcmp(cfg.output, "none")) && cfg.check == true) {
+    if ((!strcmp(cfg.output, "none")) && (cfg.check == true || cfg.bench == true)) {
         fprintf(stderr, "\033[1;31merror:\033[0m flag `-c` requires the `-o` option\n");
         exit(EXIT_FAILURE);
     }
@@ -96,9 +96,9 @@ void config_print(const config_t cfg)
 {
     char *precision;
     if (sizeof(real) == 8)
-        precision = "f64";
+        precision = "fp64";
     else
-        precision = "f32";
+        precision = "fp32";
 
     fprintf(stderr,
             "\033[1mCONFIGURATION:\033[0m\n\t%s:\t%llu\n\t%s:\t%u\n\t%s:\t%u\n\t%s:\t%lf\n\t%s:\t\t%s\n\t%s:\t\t%s\n",
