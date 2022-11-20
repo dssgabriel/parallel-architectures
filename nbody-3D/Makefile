@@ -21,7 +21,7 @@ GCC=gcc
 ICC=icc
 ICX=icx
 
-GCC_OFLAGS=-Wall -Wextra -g3 -march=native -mtune=native -Ofast -finline-functions -funroll-loops -fpeel-loops -floop-interchange -ftree-vectorize -ftree-loop-vectorize -flto
+GCC_OFLAGS=-Wall -Wextra -g3 -march=native -mtune=native -Ofast -fno-omit-frame-pointer -finline-functions -funroll-loops -fpeel-loops -floop-interchange -ftree-vectorize -ftree-loop-vectorize -flto
 ICC_OFLAGS=-w2 -g3 -xHost -mavx -Ofast -funroll-loops -finline-functions -flto -qopt-report=5 -qopt-report-file=$@.optrpt
 ICX_OFLAGS=-Wall -g3 -xHost -mavx -Ofast -funroll-loops -finline-functions -flto
 

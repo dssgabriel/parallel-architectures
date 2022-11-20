@@ -1,0 +1,8 @@
+Checks: '-*,clang-diagnostic-*,readability-identifier-length,readability-magic-numbers'
+CheckOptions:
+  - key:    readability-identifier-length.MinimumVariableNameLength
+    value:  0
+  - key:    readability-magic-numbers.IgnorePowersOf2IntegerValues
+    value:  true
+  - key:    readability-magic-numbers.IgnoredFloatingPointValues
+    value:  "0.5;1.0;100.0"
